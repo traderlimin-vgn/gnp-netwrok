@@ -20,6 +20,7 @@ import NetworkMap from "@/pages/NetworkMap";
 import Reports from "@/pages/Reports";
 import Audit from "@/pages/Audit";
 import SettingsPage from "@/pages/Settings";
+import Acs from "@/pages/Acs";
 
 function Protected({ perm, children }: { perm: string; children: ReactNode }) {
   const { data: me, isLoading, isError } = useMe();
@@ -49,6 +50,7 @@ const ROUTES: [string, string, ReactNode][] = [
   ["/network/routers", "mikrotik.view", <Routers />],
   ["/network/pppoe", "mikrotik.view", <Pppoe />],
   ["/network/actions", "mikrotik.view", <ActionLog />],
+  ["/network/acs", "mikrotik.view", <Acs />],
   ["/tickets", "tickets.view", <Tickets />],
   ["/psb", "psb.view", <PsbPage />],
   ["/technician", "technician.view", <Technician />],

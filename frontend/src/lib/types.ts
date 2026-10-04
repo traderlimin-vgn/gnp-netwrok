@@ -55,12 +55,12 @@ export interface Payment {
 export interface RouterIn {
   name: string; location: string; host: string; api_port: number; username: string;
   password?: string | null; routeros_version: string; mode: "api" | "simulator";
-  vpn: "none" | "wireguard" | "private"; latitude: number | null; longitude: number | null;
+  latitude: number | null; longitude: number | null;
 }
 export interface Router {
   id: string; router_code: string; name: string; location: string; host: string; api_port: number;
   username: string; has_password: boolean; routeros_version: string; connection_type: string;
-  mode: string; vpn: string; status: string; identity: string; last_connected: string | null; last_sync: string | null;
+  mode: string; status: string; identity: string; last_connected: string | null; last_sync: string | null;
   last_error: string; last_test_ok: boolean; response_ms: number; cpu: number; memory_used_pct: number; uptime: string;
   customers: number; latitude: number | null; longitude: number | null;
 }
@@ -137,3 +137,16 @@ export interface ReportData {
 export interface TechnicianBoard { tickets: Ticket[]; psb: Psb[]; customers: Customer[] }
 export interface Health { status: string; time: string; checks: Record<string, unknown> }
 export interface BackupFile { name: string; size: number }
+
+// GenieACS (TR-069) — mirrors backend/models/genieacs.py
+export interface AcsConfigIn { enabled: boolean; mode: "simulator" | "nbi"; url: string; username: string; password?: string | null; online_minutes: number }
+export interface AcsConfig { enabled: boolean; mode: "simulator" | "nbi"; url: string; username: string; has_password: boolean; online_minutes: number; last_test: string | null; last_test_ok: boolean | null }
+export interface AcsTestResult { success: boolean; message: string; devices: number; response_ms: number }
+export interface AcsDevice {
+  id: string; serial: string; manufacturer: string; model: string; software: string; pppoe_username: string; ip: string;
+  last_inform: string | null; rx_power: number | null; tx_power: number | null; temperature: number | null; ssid: string;
+  wifi_clients: number; uptime: number; status: "online" | "offline" | "unknown"; customer_id: string; customer_name: string;
+  customer_code: string; link_type: "manual" | "auto" | "";
+}
+export interface AcsWifiIn { ssid: string; password: string }
+export interface AcsActionResult { result: "DONE" | "QUEUED"; message: string }

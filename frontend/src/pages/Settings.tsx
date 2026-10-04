@@ -10,7 +10,7 @@ import { Field, NSelect, PageHeader, Panel, StatusBadge } from "@/components/com
 import { KV, Modal, Tbl } from "@/components/kit";
 import { apiGet, apiPost, apiPut, errMsg } from "@/lib/api";
 import { fmtDate, ROLE_LABEL } from "@/lib/format";
-import type { BackupFile, Health, IsolationMethod, Role, Settings, User, UserIn } from "@/lib/types";
+import type { AcsConfig, AcsConfigIn, AcsTestResult, BackupFile, Health, IsolationMethod, Role, Settings, User, UserIn } from "@/lib/types";
 
 const METHODS: [IsolationMethod, string][] = [["disable_secret", "Disable PPP Secret"], ["change_profile", "Change PPP Profile"], ["disconnect", "Disconnect Active Session"]];
 
@@ -79,6 +79,44 @@ function SettingsForm() {
       </Panel>
       <Button onClick={() => save.mutate(f)} disabled={save.isPending} data-testid="settings-save-button"><Save className="h-4 w-4" />Simpan Pengaturan</Button>
     </div>
+  );
+}
+
+function GenieAcsPanel() {
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ["acs-config"], queryFn: () => apiGet<AcsConfig>("/genieacs/config") });
+  const [f, setF] = useState<AcsConfigIn | null>(null);
+  const [test, setTest] = useState<AcsTestResult | null>(null);
+  useEffect(() => { if (data) setF({ enabled: data.enabled, mode: data.mode, url: data.url, username: data.username, password: "", online_minutes: data.online_minutes }); }, [data]);
+  const save = useMutation({
+    mutationFn: (b: AcsConfigIn) => apiPut<AcsConfig>("/genieacs/config", { ...b, password: b.password || null }),
+    onSuccess: (c) => { qc.setQueryData(["acs-config"], c); qc.invalidateQueries({ queryKey: ["acs-devices"] }); toast.success("Konfigurasi GenieACS disimpan"); },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  const run = useMutation({
+    mutationFn: () => apiPost<AcsTestResult>("/genieacs/test"),
+    onSuccess: (r) => { setTest(r); qc.invalidateQueries({ queryKey: ["acs-config"] }); },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  if (!f) return <div className="text-sm text-muted-foreground">Memuat…</div>;
+  const set = <K extends keyof AcsConfigIn>(k: K, v: AcsConfigIn[K]) => setF({ ...f, [k]: v });
+  return (
+    <Panel title="GenieACS (TR-069) — NBI" testid="settings-genieacs-panel">
+      <div className="grid gap-3 md:grid-cols-2">
+        <Toggle label="Enable GenieACS Integration" checked={f.enabled} onChange={(v) => set("enabled", v)} testid="acs-enabled-checkbox" hint="Manajemen ONT/modem pelanggan" />
+        <Field label="Mode"><NSelect value={f.mode} onChange={(v) => set("mode", v as AcsConfigIn["mode"])} options={[{ value: "simulator", label: "Simulator (demo)" }, { value: "nbi", label: "GenieACS NBI (server asli)" }]} testid="acs-mode-select" /></Field>
+        <Field label="URL NBI" hint="Contoh http://103.x.x.x:7557 — harus bisa diakses dari server aplikasi"><Input value={f.url} onChange={(e) => set("url", e.target.value)} className="font-mono" data-testid="acs-url-input" /></Field>
+        <Field label="Batas online (menit sejak inform terakhir)"><Input type="number" value={f.online_minutes} onChange={(e) => set("online_minutes", Number(e.target.value))} data-testid="acs-online-minutes-input" /></Field>
+        <Field label="Username NBI (opsional)"><Input value={f.username} onChange={(e) => set("username", e.target.value)} data-testid="acs-username-input" /></Field>
+        <Field label="Password NBI" hint={data?.has_password ? "Tersimpan terenkripsi · kosongkan jika tidak diubah" : "Opsional"}><Input type="password" value={f.password ?? ""} onChange={(e) => set("password", e.target.value)} data-testid="acs-password-input" /></Field>
+      </div>
+      {test && <div className={`mt-3 rounded-lg p-3 text-sm ${test.success ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"}`} data-testid="acs-test-result">{test.success ? "✓ " : "✕ "}{test.message} · {test.response_ms} ms</div>}
+      {!test && data?.last_test && <div className="mt-3 text-xs text-muted-foreground">Test terakhir: {fmtDate(data.last_test, true)} · {data.last_test_ok ? "berhasil" : "gagal"}</div>}
+      <div className="mt-3 flex gap-2">
+        <Button onClick={() => save.mutate(f)} disabled={save.isPending} data-testid="acs-save-button"><Save className="h-4 w-4" />Simpan</Button>
+        <Button variant="outline" onClick={() => run.mutate()} disabled={run.isPending} data-testid="acs-test-button">{run.isPending ? "Menguji…" : "Test Koneksi GenieACS"}</Button>
+      </div>
+    </Panel>
   );
 }
 
@@ -166,10 +204,12 @@ export default function SettingsPage() {
       <Tabs defaultValue="general">
         <TabsList data-testid="settings-tabs">
           <TabsTrigger value="general" data-testid="settings-tab-general">Network & Billing</TabsTrigger>
+          <TabsTrigger value="genieacs" data-testid="settings-tab-genieacs">GenieACS</TabsTrigger>
           <TabsTrigger value="users" data-testid="settings-tab-users">User & Role</TabsTrigger>
           <TabsTrigger value="system" data-testid="settings-tab-system">Sistem & Backup</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="mt-4"><SettingsForm /></TabsContent>
+        <TabsContent value="genieacs" className="mt-4"><GenieAcsPanel /></TabsContent>
         <TabsContent value="users" className="mt-4"><Users /></TabsContent>
         <TabsContent value="system" className="mt-4"><System /></TabsContent>
       </Tabs>

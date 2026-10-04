@@ -23,3 +23,11 @@ backend/integrations/whatsapp: IWhatsAppProvider + WhatsAppService (simulator).
 
 ## Data (Mongo collections)
 users, customers, packages, invoices, payments, mikrotik_routers, mikrotik_actions, mikrotik_pending, whatsapp_messages, tickets, psb, map_assets, notifications, audit_logs, settings, counters, sim_ppp (simulator state).
+
+## MikroTik connection (updated)
+Direct connection only: Host/IP publik + Port API (default 8728, plain API). No WireGuard/VPN field, no API-SSL.
+
+## GenieACS (TR-069) — /network/acs
+backend/integrations/genieacs: IGenieAcsProvider (base.py), GenieAcsNbiProvider (nbi_provider.py, httpx → NBI :7557, vendor param paths for RX/TX power, PPPoE, SSID, WiFi key), GenieAcsSimulator (**MOCKED**, collection acs_sim_devices), GenieAcsService (config in settings doc _id "genieacs", password encrypted, device↔customer mapping: manual acs_links else auto by PPPoE username, online = last inform within online_minutes).
+Endpoints: GET/PUT /api/genieacs/config, POST /api/genieacs/test, GET /api/genieacs/devices?q&status&customer_id, POST /api/genieacs/devices/{id}/wifi|reboot|refresh (DONE|QUEUED), PUT /api/genieacs/devices/{id}/link. All actions audited.
+UI: GenieACS / ONT page, Settings → GenieACS tab (mode simulator/nbi, URL, user/pass, test), customer detail shows ONT section.

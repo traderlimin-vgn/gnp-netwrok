@@ -11,7 +11,8 @@ import { Dot, EmptyRow, Field, NSelect, PageHeader, Pager, Panel, SearchInput, S
 import { ConfirmButton, FilterBar, KV, Modal, Tbl } from "@/components/kit";
 import { apiDelete, apiGet, apiPost, apiPut, errMsg } from "@/lib/api";
 import { can, CUSTOMER_STATUS, exportCsv, fmtBps, fmtDate, mapsUrl, rupiah, useMe } from "@/lib/format";
-import type { ActionResult, Customer, CustomerIn, CustomerSaveResult, Package, Paged, Router, User } from "@/lib/types";
+import { fmtUptime, rxTone, useAcsAction, WifiDialog } from "./Acs";
+import type { AcsDevice, ActionResult, Customer, CustomerIn, CustomerSaveResult, Package, Paged, Router, User } from "@/lib/types";
 
 const EMPTY: CustomerIn = {
   name: "", whatsapp: "", alt_phone: "", address: "", rt: "", rw: "", village: "", district: "", city: "Sidoarjo", province: "Jawa Timur",
@@ -109,6 +110,36 @@ function CustomerForm({ initial, editing, onClose }: { initial: CustomerIn; edit
   );
 }
 
+function OntSection({ c }: { c: Customer }) {
+  const { data: me } = useMe();
+  const { data = [], isLoading, error } = useQuery({ queryKey: ["acs-devices", "customer", c.id], queryFn: () => apiGet<AcsDevice[]>(`/genieacs/devices?customer_id=${c.id}`), retry: false });
+  const [wifi, setWifi] = useState<AcsDevice | null>(null);
+  const act = useAcsAction();
+  return (
+    <div data-testid="customer-ont-section">
+      <h4 className="mt-5 mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-emerald-400">ONT / GenieACS</h4>
+      {isLoading && <div className="text-xs text-muted-foreground">Memuat…</div>}
+      {error && <div className="text-xs text-red-300">{errMsg(error)}</div>}
+      {!isLoading && !error && data.length === 0 && <div className="text-xs text-muted-foreground" data-testid="customer-ont-empty">Belum ada ONT terhubung (hubungkan di menu GenieACS / ONT)</div>}
+      {data.map((d) => (
+        <div key={d.id}>
+          <KV k="Perangkat" v={`${d.manufacturer} ${d.model} · ${d.serial}`} mono />
+          <KV k="Status" v={<span className="inline-flex items-center gap-2"><Dot status={d.status} />{d.status} · {fmtDate(d.last_inform, true)}</span>} />
+          <KV k="RX / TX Power" v={<span className="font-mono"><b className={rxTone(d.rx_power)} data-testid="customer-ont-rx">{d.rx_power ?? "-"}</b> / {d.tx_power ?? "-"} dBm</span>} />
+          <KV k="WiFi" v={`${d.ssid} · ${d.wifi_clients} klien`} mono /><KV k="Uptime ONT" v={fmtUptime(d.uptime)} mono />
+          {can(me, "mikrotik.control") && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="xs" variant="outline" onClick={() => setWifi(d)} data-testid="customer-ont-wifi">Ganti WiFi</Button>
+              <ConfirmButton label="Reboot ONT" title="Reboot ONT" message={`Reboot ${d.model} ${d.serial}? Internet pelanggan putus 1–2 menit.`} onConfirm={() => act.mutate({ id: d.id, action: "reboot" })} testid="customer-ont-reboot" />
+            </div>
+          )}
+        </div>
+      ))}
+      {wifi && <WifiDialog d={wifi} onClose={() => setWifi(null)} />}
+    </div>
+  );
+}
+
 function CustomerDetail({ c, onClose, onEdit }: { c: Customer; onClose: () => void; onEdit: () => void }) {
   const qc = useQueryClient();
   const { data: me } = useMe();
@@ -159,6 +190,7 @@ function CustomerDetail({ c, onClose, onEdit }: { c: Customer; onClose: () => vo
           <KV k="Uptime" v={c.uptime} mono /><KV k="Last Online" v={fmtDate(c.last_online, true)} /><KV k="Last Offline" v={fmtDate(c.last_offline, true)} />
           <KV k="RX / TX" v={`${fmtBps(c.rx_bytes)} / ${fmtBps(c.tx_bytes)}`} mono /><KV k="Comment" v={c.comment} />
           {c.integration_error && <div className="mt-2 rounded-lg bg-red-500/10 p-2 text-xs text-red-300" data-testid="customer-integration-error">{c.integration_error}</div>}
+          {can(me, "mikrotik.view") && <OntSection c={c} />}
           {ctl && (
             <div className="mt-4 flex flex-wrap gap-2" data-testid="customer-mikrotik-actions">
               {actions.map(([a, label, icon, msg]) => (

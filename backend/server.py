@@ -15,7 +15,7 @@ load_dotenv(ROOT_DIR / '.env')
 from lib.db import client, db, ensure_indexes  # noqa: E402
 from lib.jobs import start_workers  # noqa: E402
 from lib.settings import get_settings  # noqa: E402
-from routers import auth, customers, billing as billing_router, mikrotik, ops, insights  # noqa: E402
+from routers import auth, customers, billing as billing_router, mikrotik, ops, insights, genieacs  # noqa: E402
 from services import billing  # noqa: E402
 from integrations.mikrotik.services import MikroTikBillingService  # noqa: E402
 
@@ -85,7 +85,7 @@ async def security_middleware(request: Request, call_next):
     return resp
 
 
-for r in (auth.router, customers.router, billing_router.router, mikrotik.router, ops.router, insights.router):
+for r in (auth.router, customers.router, billing_router.router, mikrotik.router, ops.router, insights.router, genieacs.router):
     api_router.include_router(r)
 
 app.add_middleware(

@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, Bell, Boxes, ClipboardList, FileText, Gauge, HardHat, LogOut, Map as MapIcon, Menu, MessageCircle,
-  Network, ReceiptText, Router as RouterIcon, ScrollText, Settings as SettingsIcon, ShieldCheck, Users, Wallet, Wrench, BarChart3,
+  Network, ReceiptText, Cable, Router as RouterIcon, ScrollText, Settings as SettingsIcon, ShieldCheck, Users, Wallet, Wrench, BarChart3,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -30,6 +30,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     { to: "/network/routers", label: "MikroTik Routers", icon: <RouterIcon />, perm: "mikrotik.view", testid: "nav-routers" },
     { to: "/network/pppoe", label: "Monitoring PPPoE", icon: <Activity />, perm: "mikrotik.view", testid: "nav-pppoe" },
     { to: "/network/actions", label: "MikroTik Action Log", icon: <ScrollText />, perm: "mikrotik.view", testid: "nav-actions" },
+    { to: "/network/acs", label: "GenieACS / ONT", icon: <Cable />, perm: "mikrotik.view", testid: "nav-acs" },
   ] },
   { title: "Lapangan", items: [
     { to: "/tickets", label: "Tiket Gangguan", icon: <Wrench />, perm: "tickets.view", testid: "nav-tickets" },

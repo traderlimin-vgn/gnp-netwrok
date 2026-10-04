@@ -276,7 +276,6 @@ class RouterIn(BaseModel):
     password: str | None = Field(default=None, max_length=128)
     routeros_version: str = ""
     mode: Literal["api", "simulator"] = "api"
-    vpn: Literal["none", "wireguard", "private"] = "none"
     latitude: float | None = None
     longitude: float | None = None
 
@@ -301,7 +300,6 @@ class Router(Out):
     routeros_version: str = ""
     connection_type: str = "api"
     mode: str = "api"
-    vpn: str = "none"
     status: str = "unknown"
     identity: str = ""
     last_connected: str | None = None

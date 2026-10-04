@@ -73,17 +73,17 @@ async def main():
         await db.packages.insert_one(doc)
         packages.append(doc)
 
-    r_specs = [("GMP-KRIAN-01", "POP Krian Utama", "10.20.0.1", "RB4011", False, "wireguard"),
-               ("GMP-KRIAN-02", "POP Krian Barat", "10.20.0.2", "RB450Gx4", False, "wireguard"),
-               ("GMP-TAMAN-01", "POP Taman", "10.20.1.1", "CCR1009", False, "wireguard"),
-               ("GMP-SEPANJANG-01", "POP Sepanjang", "10.20.2.1", "CCR2004", False, "private"),
-               ("GMP-SIDOARJO-01", "POP Sidoarjo Kota", "10.20.3.1", "RB750Gr3", True, "wireguard")]
+    r_specs = [("GMP-KRIAN-01", "POP Krian Utama", "10.20.0.1", "RB4011", False),
+               ("GMP-KRIAN-02", "POP Krian Barat", "10.20.0.2", "RB450Gx4", False),
+               ("GMP-TAMAN-01", "POP Taman", "10.20.1.1", "CCR1009", False),
+               ("GMP-SEPANJANG-01", "POP Sepanjang", "10.20.2.1", "CCR2004", False),
+               ("GMP-SIDOARJO-01", "POP Sidoarjo Kota", "10.20.3.1", "RB750Gr3", True)]
     routers = []
-    for name, loc, host, board, offline, vpn in r_specs:
+    for name, loc, host, board, offline in r_specs:
         lat, lng = jitter(0.035)
         doc = {"id": uid(), "router_code": await next_code("RTR"), "name": name, "location": loc, "host": host, "api_port": 8728,
                "username": "gmp-api", "password_enc": encrypt_secret("gmp-api-Secr3t"),
-               "routeros_version": "7.14.3", "mode": "simulator", "vpn": vpn, "board": board,
+               "routeros_version": "7.14.3", "mode": "simulator", "board": board,
                "sim_offline": offline, "status": "offline" if offline else "online", "identity": name,
                "last_connected": None if offline else now_iso(), "last_sync": None if offline else now_iso(),
                "last_error": "MIKROTIK_TIMEOUT: Router tidak merespons dalam batas waktu (timeout)." if offline else "",

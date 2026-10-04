@@ -12,7 +12,7 @@ import type { Router, RouterIn, SyncResult, TestResult } from "@/lib/types";
 
 const EMPTY: RouterIn = {
   name: "", location: "", host: "", api_port: 8728, username: "gmp-api", password: "", routeros_version: "",
-  mode: "api", vpn: "none", latitude: null, longitude: null,
+  mode: "api", latitude: null, longitude: null,
 };
 
 function RouterForm({ editing, onClose }: { editing: Router | null; onClose: () => void }) {
@@ -20,7 +20,7 @@ function RouterForm({ editing, onClose }: { editing: Router | null; onClose: () 
   const [f, setF] = useState<RouterIn>(editing ? {
     name: editing.name, location: editing.location, host: editing.host, api_port: editing.api_port,
     username: editing.username, password: "", routeros_version: editing.routeros_version,
-    mode: editing.mode as RouterIn["mode"], vpn: editing.vpn as RouterIn["vpn"], latitude: editing.latitude, longitude: editing.longitude,
+    mode: editing.mode as RouterIn["mode"], latitude: editing.latitude, longitude: editing.longitude,
   } : EMPTY);
   const set = <K extends keyof RouterIn>(k: K, v: RouterIn[K]) => setF((p) => ({ ...p, [k]: v }));
   const save = useMutation({
@@ -40,16 +40,15 @@ function RouterForm({ editing, onClose }: { editing: Router | null; onClose: () 
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Nama Router"><Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="GMP-KRIAN-01" className="font-mono" data-testid="router-name-input" /></Field>
         <Field label="Nama lokasi"><Input value={f.location} onChange={(e) => set("location", e.target.value)} data-testid="router-location-input" /></Field>
-        <Field label="IP Address / Host"><Input value={f.host} onChange={(e) => set("host", e.target.value)} placeholder="10.10.0.2" className="font-mono" data-testid="router-host-input" /></Field>
+        <Field label="IP Address / Host"><Input value={f.host} onChange={(e) => set("host", e.target.value)} placeholder="IP publik / domain, mis. 103.x.x.x" className="font-mono" data-testid="router-host-input" /></Field>
         <Field label="Port API"><Input type="number" value={f.api_port} onChange={(e) => set("api_port", Number(e.target.value))} data-testid="router-api-port-input" /></Field>
         <Field label="RouterOS Version"><Input value={f.routeros_version} onChange={(e) => set("routeros_version", e.target.value)} placeholder="auto-detect" data-testid="router-version-input" /></Field>
         <Field label="Username API"><Input value={f.username} onChange={(e) => set("username", e.target.value)} className="font-mono" data-testid="router-username-input" /></Field>
         <Field label="Password API" hint={editing?.has_password ? "Tersimpan terenkripsi · kosongkan jika tidak diubah" : undefined}><Input type="password" value={f.password ?? ""} onChange={(e) => set("password", e.target.value)} placeholder="********" data-testid="router-password-input" /></Field>
         <Field label="Mode Koneksi" hint="Simulator untuk demo tanpa router fisik"><NSelect value={f.mode} onChange={(v) => set("mode", v as RouterIn["mode"])} options={[{ value: "api", label: "MikroTik API (RouterOS)" }, { value: "simulator", label: "Simulator" }]} testid="router-mode-select" /></Field>
-        <Field label="Jalur Jaringan"><NSelect value={f.vpn} onChange={(v) => set("vpn", v as RouterIn["vpn"])} options={[{ value: "none", label: "Langsung (LAN)" }, { value: "wireguard", label: "WireGuard VPN" }, { value: "private", label: "Private Network" }]} testid="router-vpn-select" /></Field>
         <Field label="Latitude"><Input type="number" step="any" value={f.latitude ?? ""} onChange={(e) => set("latitude", nn(e.target.value))} data-testid="router-lat-input" /></Field>
         <Field label="Longitude"><Input type="number" step="any" value={f.longitude ?? ""} onChange={(e) => set("longitude", nn(e.target.value))} data-testid="router-lng-input" /></Field>
-        <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-2 text-xs text-sky-200 sm:col-span-3" data-testid="router-protocol-note">Protokol: MikroTik API (port default 8728). Aktifkan di router: /ip service enable api, set address=IP server/VPN.</div>
+        <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-2 text-xs text-sky-200 sm:col-span-3" data-testid="router-protocol-note">Koneksi langsung: isi IP publik / domain + Port API (default 8728, bisa port forward lain). Di router: /ip service set api disabled=no port=8728 address=IP-server-GMP.</div>
       </div>
     </Modal>
   );
@@ -158,7 +157,7 @@ export default function Routers() {
             <div className="mt-3 grid grid-cols-2 gap-x-4 text-xs">
               <KV k="Host" v={r.host} mono /><KV k="Protokol" v={r.connection_type} mono />
               <KV k="Port API" v={String(r.api_port)} mono /><KV k="User" v={<span className="inline-flex items-center gap-1"><KeyRound className="h-3 w-3" />{r.username}</span>} mono />
-              <KV k="RouterOS" v={r.routeros_version} mono /><KV k="Jalur" v={r.vpn === "wireguard" ? "WireGuard" : r.vpn === "private" ? "Private" : "LAN"} />
+              <KV k="RouterOS" v={r.routeros_version} mono /><KV k="Koneksi" v="Langsung" />
               <KV k="Mode" v={r.mode} /><KV k="Pelanggan" v={String(r.customers)} />
               <KV k="Last connected" v={fmtDate(r.last_connected, true)} /><KV k="Last sync" v={fmtDate(r.last_sync, true)} />
             </div>
@@ -192,9 +191,9 @@ export default function Routers() {
           {syncRes.res.errors.length > 0 && <div className="mt-2 space-y-1">{syncRes.res.errors.map((e, i) => <div key={i} className="font-mono text-xs text-red-300">{e}</div>)}</div>}
         </Modal>
       )}
-      <Panel title="Topologi yang direkomendasikan" className="mt-4">
+      <Panel title="Topologi koneksi langsung" className="mt-4">
         <div className="font-mono text-xs leading-6 text-muted-foreground">
-          NETWORK GMP SERVER → WireGuard / Private Network → MikroTik (/ip service api port=8728, address=IP server) → PPPoE / Hotspot → Pelanggan
+          NETWORK GMP SERVER → Internet (IP publik / port forward) → MikroTik API :8728 (/ip service set api address=IP-server) → PPPoE / Hotspot → Pelanggan
         </div>
       </Panel>
     </div>
