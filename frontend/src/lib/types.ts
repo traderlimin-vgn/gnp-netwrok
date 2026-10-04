@@ -53,13 +53,13 @@ export interface Payment {
 }
 
 export interface RouterIn {
-  name: string; location: string; host: string; api_port: number; api_ssl_port: number; username: string;
-  password?: string | null; routeros_version: string; ssl_enabled: boolean; mode: "api" | "simulator";
+  name: string; location: string; host: string; api_port: number; username: string;
+  password?: string | null; routeros_version: string; mode: "api" | "simulator";
   vpn: "none" | "wireguard" | "private"; latitude: number | null; longitude: number | null;
 }
 export interface Router {
-  id: string; router_code: string; name: string; location: string; host: string; api_port: number; api_ssl_port: number;
-  username: string; has_password: boolean; routeros_version: string; connection_type: string; ssl_enabled: boolean;
+  id: string; router_code: string; name: string; location: string; host: string; api_port: number;
+  username: string; has_password: boolean; routeros_version: string; connection_type: string;
   mode: string; vpn: string; status: string; identity: string; last_connected: string | null; last_sync: string | null;
   last_error: string; last_test_ok: boolean; response_ms: number; cpu: number; memory_used_pct: number; uptime: string;
   customers: number; latitude: number | null; longitude: number | null;
@@ -86,7 +86,7 @@ export interface ActionResult { result: string; message: string }
 export interface AutomationResult { overdue_marked: number; isolated: number; skipped: number; auto_isolation: boolean }
 export type IsolationMethod = "disable_secret" | "change_profile" | "disconnect";
 export interface Settings {
-  mikrotik_enabled: boolean; default_protocol: "api" | "api-ssl"; api_port: number; api_ssl_port: number; timeout_ms: number;
+  mikrotik_enabled: boolean; default_protocol: "api"; api_port: number; timeout_ms: number;
   retry_count: number; polling_interval: number; auto_sync: boolean; auto_isolation: boolean; auto_activation: boolean;
   grace_days: number; isolation_methods: IsolationMethod[]; isolation_profile: string; due_day: number; late_fee: number;
   company_name: string; company_phone: string; company_address: string; whatsapp_provider: string;

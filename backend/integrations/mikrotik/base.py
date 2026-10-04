@@ -1,4 +1,4 @@
-"""IMikroTikProvider — the contract every MikroTik transport implements (API/API-SSL, simulator)."""
+"""IMikroTikProvider — the contract every MikroTik transport implements (RouterOS API 8728, simulator)."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -8,7 +8,6 @@ ERROR_MESSAGES = {
     "MIKROTIK_CONNECTION_FAILED": "Tidak dapat terhubung ke router. Periksa host, port API, firewall dan jalur VPN/WireGuard.",
     "MIKROTIK_AUTH_FAILED": "Autentikasi gagal. Periksa username/password user API (mis. gmp-api).",
     "MIKROTIK_TIMEOUT": "Router tidak merespons dalam batas waktu (timeout).",
-    "MIKROTIK_SSL_ERROR": "Handshake SSL gagal. Pastikan service api-ssl aktif dan sertifikat terpasang.",
     "MIKROTIK_COMMAND_FAILED": "Perintah ditolak oleh router.",
     "MIKROTIK_USER_NOT_FOUND": "PPP secret tidak ditemukan di router.",
     "MIKROTIK_ROUTER_OFFLINE": "Router sedang offline. Aksi dimasukkan ke antrian dan akan dicoba ulang.",
@@ -33,7 +32,6 @@ class RouterConfig:
     name: str
     host: str
     port: int
-    use_ssl: bool
     username: str
     password: str
     timeout: float

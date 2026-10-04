@@ -272,11 +272,9 @@ class RouterIn(BaseModel):
     location: str = ""
     host: str
     api_port: int = Field(default=8728, ge=1, le=65535)
-    api_ssl_port: int = Field(default=8729, ge=1, le=65535)
     username: str = Field(min_length=1, max_length=60)
     password: str | None = Field(default=None, max_length=128)
     routeros_version: str = ""
-    ssl_enabled: bool = True
     mode: Literal["api", "simulator"] = "api"
     vpn: Literal["none", "wireguard", "private"] = "none"
     latitude: float | None = None
@@ -298,12 +296,10 @@ class Router(Out):
     location: str = ""
     host: str
     api_port: int
-    api_ssl_port: int
     username: str
     has_password: bool = False
     routeros_version: str = ""
-    connection_type: str = "api-ssl"
-    ssl_enabled: bool = True
+    connection_type: str = "api"
     mode: str = "api"
     vpn: str = "none"
     status: str = "unknown"
@@ -407,9 +403,8 @@ class AutomationResult(BaseModel):
 
 class Settings(BaseModel):
     mikrotik_enabled: bool
-    default_protocol: Literal["api", "api-ssl"]
+    default_protocol: Literal["api"] = "api"
     api_port: int = Field(ge=1, le=65535)
-    api_ssl_port: int = Field(ge=1, le=65535)
     timeout_ms: int = Field(ge=1000, le=60000)
     retry_count: int = Field(ge=1, le=5)
     polling_interval: int = Field(ge=30, le=600)

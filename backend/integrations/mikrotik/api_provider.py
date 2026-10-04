@@ -1,9 +1,8 @@
-"""MikroTikApiProvider — real RouterOS API (8728) / API-SSL (8729) via librouteros.
+"""MikroTikApiProvider — real RouterOS API (plain API, port 8728) via librouteros.
 Runs only on the backend; credentials are decrypted in memory just before connecting."""
 
 import asyncio
 import socket
-import ssl
 import time
 
 from librouteros import connect as ros_connect
@@ -17,15 +16,8 @@ class MikroTikApiProvider(IMikroTikProvider):
 
     def _open(self):
         kw = dict(username=self.cfg.username, password=self.cfg.password, port=self.cfg.port, timeout=self.cfg.timeout)
-        if self.cfg.use_ssl:
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE  # RouterOS commonly uses self-signed certs; restrict via firewall/VPN
-            kw["ssl_wrapper"] = ctx.wrap_socket
         try:
             return ros_connect(host=self.cfg.host, **kw)
-        except ssl.SSLError as e:
-            raise MikroTikError("MIKROTIK_SSL_ERROR", str(e))
         except (socket.timeout, TimeoutError) as e:
             raise MikroTikError("MIKROTIK_TIMEOUT", str(e))
         except TrapError as e:

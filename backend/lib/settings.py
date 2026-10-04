@@ -1,12 +1,11 @@
-"""App settings (MikroTik integration + billing). Safe defaults: API-SSL, automation OFF until tested."""
+"""App settings (MikroTik integration + billing). Protocol: MikroTik API (8728) only, automation OFF until tested."""
 
 from lib.db import db
 
 DEFAULTS = {
     "mikrotik_enabled": True,
-    "default_protocol": "api-ssl",
+    "default_protocol": "api",
     "api_port": 8728,
-    "api_ssl_port": 8729,
     "timeout_ms": 10000,
     "retry_count": 3,
     "polling_interval": 30,

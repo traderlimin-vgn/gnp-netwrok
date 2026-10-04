@@ -43,9 +43,9 @@ export default function Login() {
         </div>
         <div className="relative mt-auto max-w-lg">
           <h1 className="font-heading text-5xl font-semibold leading-[1.05] text-white">Billing, MikroTik &amp; lapangan dalam satu konsol NOC.</h1>
-          <p className="mt-4 text-slate-400">Tagihan otomatis, isolir &amp; aktivasi via MikroTik API/API-SSL, monitoring PPPoE, tiket gangguan dan PSB untuk RT/RW Net.</p>
+          <p className="mt-4 text-slate-400">Tagihan otomatis, isolir &amp; aktivasi via MikroTik API, monitoring PPPoE, tiket gangguan dan PSB untuk RT/RW Net.</p>
           <div className="mt-8 grid grid-cols-3 gap-3">
-            {[[<ShieldCheck key="a" />, "API-SSL", "Kredensial terenkripsi"], [<Zap key="b" />, "Auto Isolir", "Idempoten & fail-safe"], [<Radio key="c" />, "PPPoE Live", "Polling 30–60 detik"]].map(([ic, t, d]) => (
+            {[[<ShieldCheck key="a" />, "MikroTik API", "Kredensial terenkripsi"], [<Zap key="b" />, "Auto Isolir", "Idempoten & fail-safe"], [<Radio key="c" />, "PPPoE Live", "Polling 30–60 detik"]].map(([ic, t, d]) => (
               <div key={String(t)} className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
                 <div className="text-sky-400 [&_svg]:h-4 [&_svg]:w-4">{ic}</div>
                 <div className="mt-2 text-sm font-semibold text-white">{t}</div>

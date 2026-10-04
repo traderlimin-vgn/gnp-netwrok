@@ -40,7 +40,7 @@ function SettingsForm() {
     <div className="space-y-4">
       <Panel title="Network → MikroTik" testid="settings-mikrotik-panel">
         <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-200">
-          <ShieldAlert className="h-4 w-4 shrink-0" />Default aman: API-SSL, Auto Isolation & Auto Activation OFF. Lakukan TEST CONNECTION di setiap router sebelum mengaktifkan otomasi.
+          <ShieldAlert className="h-4 w-4 shrink-0" />Protokol: MikroTik API (8728). Default aman: Auto Isolation & Auto Activation OFF. Lakukan TEST CONNECTION di setiap router sebelum mengaktifkan otomasi.
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           <Toggle label="Enable MikroTik Integration" checked={f.mikrotik_enabled} onChange={(v) => set("mikrotik_enabled", v)} testid="settings-mikrotik-enabled" hint="Jika OFF, billing tetap berjalan tanpa aksi ke router" />
@@ -49,9 +49,8 @@ function SettingsForm() {
           <Toggle label="Auto Activation" checked={f.auto_activation} onChange={(v) => set("auto_activation", v)} testid="settings-auto-activation" hint="Aktifkan kembali otomatis setelah pembayaran" />
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Field label="Default Protocol"><NSelect value={f.default_protocol} onChange={(v) => set("default_protocol", v as Settings["default_protocol"])} options={[{ value: "api-ssl", label: "API-SSL" }, { value: "api", label: "API" }]} testid="settings-protocol-select" /></Field>
+          <Field label="Default Protocol"><NSelect value={f.default_protocol} onChange={(v) => set("default_protocol", v as Settings["default_protocol"])} options={[{ value: "api", label: "API (8728)" }]} testid="settings-protocol-select" /></Field>
           <Field label="API Port"><Input type="number" value={f.api_port} onChange={(e) => set("api_port", Number(e.target.value))} data-testid="settings-api-port" /></Field>
-          <Field label="API-SSL Port"><Input type="number" value={f.api_ssl_port} onChange={(e) => set("api_ssl_port", Number(e.target.value))} data-testid="settings-api-ssl-port" /></Field>
           <Field label="Timeout (ms)"><Input type="number" value={f.timeout_ms} onChange={(e) => set("timeout_ms", Number(e.target.value))} data-testid="settings-timeout" /></Field>
           <Field label="Retry Count"><Input type="number" value={f.retry_count} onChange={(e) => set("retry_count", Number(e.target.value))} data-testid="settings-retry" /></Field>
           <Field label="Polling (detik)" hint="30–300"><Input type="number" value={f.polling_interval} onChange={(e) => set("polling_interval", Number(e.target.value))} data-testid="settings-polling" /></Field>

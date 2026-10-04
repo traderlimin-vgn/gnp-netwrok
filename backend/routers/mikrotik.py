@@ -14,7 +14,7 @@ router = APIRouter()
 
 def router_out(r: dict, customers: int = 0) -> dict:
     r = {k: v for k, v in r.items() if k != "password_enc"} | {"has_password": bool(r.get("password_enc"))}
-    r["connection_type"] = "api-ssl" if r.get("ssl_enabled") else "api"
+    r["connection_type"] = "api"
     r["customers"] = customers
     return r
 
@@ -47,7 +47,7 @@ async def create_router(body: RouterIn, actor: dict = Depends(require("mikrotik.
     doc = {**body.model_dump(exclude={"password"}), "password_enc": encrypt_secret(body.password), "id": uid(),
            "router_code": await next_code("RTR"), "status": "unknown", "created_at": now_iso(), "last_test_ok": False}
     await db.mikrotik_routers.insert_one(doc)
-    await audit(actor, "TAMBAH_ROUTER", "router", doc["id"], f"{doc['name']} {doc['host']} ({'API-SSL' if body.ssl_enabled else 'API'})")
+    await audit(actor, "TAMBAH_ROUTER", "router", doc["id"], f"{doc['name']} {doc['host']} (API)")
     return router_out(clean(doc))
 
 

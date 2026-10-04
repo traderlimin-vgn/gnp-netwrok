@@ -18,7 +18,7 @@ Auth: httpOnly cookie session (JWT), bcrypt hashing, CSRF header `X-Requested-Wi
 - Tiket (/tickets) TKT-GMP-000001, PSB (/psb) PSB-GMP-000001, Teknisi mobile dashboard (/technician), Peta Leaflet (/map), Laporan (/reports + CSV/XLSX export), Audit (/audit), Pengaturan (/settings: MikroTik/billing settings, users, health, backups).
 
 ## Integration layer
-backend/integrations/mikrotik: IMikroTikProvider (base.py), MikroTikApiProvider (api_provider.py, real RouterOS API/API-SSL), simulator.py (**MOCKED routers for preview**), services.py (Connection/Customer/Billing services, retry+exponential backoff, action log). Router mode `api` vs `simulator`. Credentials encrypted (Fernet) and never returned to browser.
+backend/integrations/mikrotik: IMikroTikProvider (base.py), MikroTikApiProvider (api_provider.py, real RouterOS plain API only, port 8728 — API-SSL removed per user request), simulator.py (**MOCKED routers for preview**), services.py (Connection/Customer/Billing services, retry+exponential backoff, action log). Router mode `api` vs `simulator`. Credentials encrypted (Fernet) and never returned to browser.
 backend/integrations/whatsapp: IWhatsAppProvider + WhatsAppService (simulator).
 
 ## Data (Mongo collections)

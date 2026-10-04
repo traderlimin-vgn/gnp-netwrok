@@ -4,7 +4,6 @@ import { Cpu, KeyRound, MemoryStick, Pencil, Plus, RefreshCw, ShieldCheck, Trash
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dot, Field, NSelect, PageHeader, Panel, StatusBadge } from "@/components/common";
 import { ConfirmButton, KV, Modal } from "@/components/kit";
 import { apiDelete, apiGet, apiPost, apiPut, errMsg } from "@/lib/api";
@@ -12,15 +11,15 @@ import { can, fmtDate, useMe } from "@/lib/format";
 import type { Router, RouterIn, SyncResult, TestResult } from "@/lib/types";
 
 const EMPTY: RouterIn = {
-  name: "", location: "", host: "", api_port: 8728, api_ssl_port: 8729, username: "gmp-api", password: "", routeros_version: "",
-  ssl_enabled: true, mode: "api", vpn: "none", latitude: null, longitude: null,
+  name: "", location: "", host: "", api_port: 8728, username: "gmp-api", password: "", routeros_version: "",
+  mode: "api", vpn: "none", latitude: null, longitude: null,
 };
 
 function RouterForm({ editing, onClose }: { editing: Router | null; onClose: () => void }) {
   const qc = useQueryClient();
   const [f, setF] = useState<RouterIn>(editing ? {
-    name: editing.name, location: editing.location, host: editing.host, api_port: editing.api_port, api_ssl_port: editing.api_ssl_port,
-    username: editing.username, password: "", routeros_version: editing.routeros_version, ssl_enabled: editing.ssl_enabled,
+    name: editing.name, location: editing.location, host: editing.host, api_port: editing.api_port,
+    username: editing.username, password: "", routeros_version: editing.routeros_version,
     mode: editing.mode as RouterIn["mode"], vpn: editing.vpn as RouterIn["vpn"], latitude: editing.latitude, longitude: editing.longitude,
   } : EMPTY);
   const set = <K extends keyof RouterIn>(k: K, v: RouterIn[K]) => setF((p) => ({ ...p, [k]: v }));
@@ -43,7 +42,6 @@ function RouterForm({ editing, onClose }: { editing: Router | null; onClose: () 
         <Field label="Nama lokasi"><Input value={f.location} onChange={(e) => set("location", e.target.value)} data-testid="router-location-input" /></Field>
         <Field label="IP Address / Host"><Input value={f.host} onChange={(e) => set("host", e.target.value)} placeholder="10.10.0.2" className="font-mono" data-testid="router-host-input" /></Field>
         <Field label="Port API"><Input type="number" value={f.api_port} onChange={(e) => set("api_port", Number(e.target.value))} data-testid="router-api-port-input" /></Field>
-        <Field label="Port API-SSL"><Input type="number" value={f.api_ssl_port} onChange={(e) => set("api_ssl_port", Number(e.target.value))} data-testid="router-api-ssl-port-input" /></Field>
         <Field label="RouterOS Version"><Input value={f.routeros_version} onChange={(e) => set("routeros_version", e.target.value)} placeholder="auto-detect" data-testid="router-version-input" /></Field>
         <Field label="Username API"><Input value={f.username} onChange={(e) => set("username", e.target.value)} className="font-mono" data-testid="router-username-input" /></Field>
         <Field label="Password API" hint={editing?.has_password ? "Tersimpan terenkripsi · kosongkan jika tidak diubah" : undefined}><Input type="password" value={f.password ?? ""} onChange={(e) => set("password", e.target.value)} placeholder="********" data-testid="router-password-input" /></Field>
@@ -51,7 +49,7 @@ function RouterForm({ editing, onClose }: { editing: Router | null; onClose: () 
         <Field label="Jalur Jaringan"><NSelect value={f.vpn} onChange={(v) => set("vpn", v as RouterIn["vpn"])} options={[{ value: "none", label: "Langsung (LAN)" }, { value: "wireguard", label: "WireGuard VPN" }, { value: "private", label: "Private Network" }]} testid="router-vpn-select" /></Field>
         <Field label="Latitude"><Input type="number" step="any" value={f.latitude ?? ""} onChange={(e) => set("latitude", nn(e.target.value))} data-testid="router-lat-input" /></Field>
         <Field label="Longitude"><Input type="number" step="any" value={f.longitude ?? ""} onChange={(e) => set("longitude", nn(e.target.value))} data-testid="router-lng-input" /></Field>
-        <label className="flex items-center gap-2 text-sm sm:col-span-3"><Checkbox checked={f.ssl_enabled} onCheckedChange={(v) => set("ssl_enabled", !!v)} data-testid="router-ssl-checkbox" />Gunakan API-SSL (direkomendasikan)</label>
+        <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-2 text-xs text-sky-200 sm:col-span-3" data-testid="router-protocol-note">Protokol: MikroTik API (port default 8728). Aktifkan di router: /ip service enable api, set address=IP server/VPN.</div>
       </div>
     </Modal>
   );
@@ -59,7 +57,7 @@ function RouterForm({ editing, onClose }: { editing: Router | null; onClose: () 
 
 function TestDialog({ r, result, pending, onClose }: { r: Router; result: TestResult | null; pending: boolean; onClose: () => void }) {
   return (
-    <Modal open onClose={onClose} title={`Test Connection — ${r.name}`} description={`${r.connection_type} ${r.host}:${r.ssl_enabled ? r.api_ssl_port : r.api_port}`} testid="router-test-dialog">
+    <Modal open onClose={onClose} title={`Test Connection — ${r.name}`} description={`${r.connection_type} ${r.host}:${r.api_port}`} testid="router-test-dialog">
       {pending && <div className="flex items-center gap-2 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" />Menghubungi router (dengan retry & backoff)…</div>}
       {result && (
         <div className="space-y-2" data-testid="router-test-result">
@@ -136,7 +134,7 @@ export default function Routers() {
   const manage = can(me, "mikrotik.routers");
   return (
     <div>
-      <PageHeader eyebrow="Network" title="MikroTik Routers" subtitle="NETWORK GMP → Backend → MikroTik API/API-SSL → Router. Tidak ada koneksi langsung dari browser ke MikroTik."
+      <PageHeader eyebrow="Network" title="MikroTik Routers" subtitle="NETWORK GMP → Backend → MikroTik API (8728) → Router. Tidak ada koneksi langsung dari browser ke MikroTik."
         actions={manage && <Button size="sm" onClick={() => setForm({ editing: null })} data-testid="routers-add-button"><Plus className="h-4 w-4" />Tambah Router</Button>} />
       <div className="mb-4 flex flex-wrap gap-3">
         <div className="flex items-center gap-2 rounded-xl border bg-card px-4 py-2.5 text-sm" data-testid="routers-online-count"><Dot status="online" /><b>{online}</b> Online</div>
@@ -159,7 +157,7 @@ export default function Routers() {
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-4 text-xs">
               <KV k="Host" v={r.host} mono /><KV k="Protokol" v={r.connection_type} mono />
-              <KV k="Port" v={`${r.api_port} / ${r.api_ssl_port}`} mono /><KV k="User" v={<span className="inline-flex items-center gap-1"><KeyRound className="h-3 w-3" />{r.username}</span>} mono />
+              <KV k="Port API" v={String(r.api_port)} mono /><KV k="User" v={<span className="inline-flex items-center gap-1"><KeyRound className="h-3 w-3" />{r.username}</span>} mono />
               <KV k="RouterOS" v={r.routeros_version} mono /><KV k="Jalur" v={r.vpn === "wireguard" ? "WireGuard" : r.vpn === "private" ? "Private" : "LAN"} />
               <KV k="Mode" v={r.mode} /><KV k="Pelanggan" v={String(r.customers)} />
               <KV k="Last connected" v={fmtDate(r.last_connected, true)} /><KV k="Last sync" v={fmtDate(r.last_sync, true)} />
@@ -196,7 +194,7 @@ export default function Routers() {
       )}
       <Panel title="Topologi yang direkomendasikan" className="mt-4">
         <div className="font-mono text-xs leading-6 text-muted-foreground">
-          NETWORK GMP SERVER → WireGuard / Private Network → MikroTik (/ip service api-ssl, address=IP server) → PPPoE / Hotspot → Pelanggan
+          NETWORK GMP SERVER → WireGuard / Private Network → MikroTik (/ip service api port=8728, address=IP server) → PPPoE / Hotspot → Pelanggan
         </div>
       </Panel>
     </div>

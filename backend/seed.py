@@ -82,8 +82,8 @@ async def main():
     for name, loc, host, board, offline, vpn in r_specs:
         lat, lng = jitter(0.035)
         doc = {"id": uid(), "router_code": await next_code("RTR"), "name": name, "location": loc, "host": host, "api_port": 8728,
-               "api_ssl_port": 8729, "username": "gmp-api", "password_enc": encrypt_secret("gmp-api-Secr3t"),
-               "routeros_version": "7.14.3", "ssl_enabled": True, "mode": "simulator", "vpn": vpn, "board": board,
+               "username": "gmp-api", "password_enc": encrypt_secret("gmp-api-Secr3t"),
+               "routeros_version": "7.14.3", "mode": "simulator", "vpn": vpn, "board": board,
                "sim_offline": offline, "status": "offline" if offline else "online", "identity": name,
                "last_connected": None if offline else now_iso(), "last_sync": None if offline else now_iso(),
                "last_error": "MIKROTIK_TIMEOUT: Router tidak merespons dalam batas waktu (timeout)." if offline else "",

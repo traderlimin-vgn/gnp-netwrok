@@ -33,11 +33,9 @@ async def log_action(router: dict | None, action: str, result: str, actor: str =
 class MikroTikConnectionService:
     @staticmethod
     def provider(router: dict, settings: dict) -> IMikroTikProvider:
-        use_ssl = bool(router.get("ssl_enabled"))
         cfg = RouterConfig(
             id=router["id"], name=router["name"], host=router["host"],
-            port=int(router.get("api_ssl_port") if use_ssl else router.get("api_port")),
-            use_ssl=use_ssl, username=router.get("username", ""),
+            port=int(router.get("api_port") or 8728), username=router.get("username", ""),
             password=decrypt_secret(router.get("password_enc", "")),
             timeout=settings.get("timeout_ms", int(os.environ.get("MIKROTIK_API_TIMEOUT", 10000))) / 1000, raw=router,
         )
@@ -78,7 +76,7 @@ class MikroTikConnectionService:
     @classmethod
     async def test(cls, router: dict, actor: str) -> dict:
         steps = [
-            {"key": "connect", "label": "Terhubung ke MikroTik API/API-SSL", "ok": False, "detail": ""},
+            {"key": "connect", "label": "Terhubung ke MikroTik API", "ok": False, "detail": ""},
             {"key": "auth", "label": "Autentikasi berhasil", "ok": False, "detail": ""},
             {"key": "identity", "label": "Router Identity terdeteksi", "ok": False, "detail": ""},
             {"key": "version", "label": "Versi RouterOS terdeteksi", "ok": False, "detail": ""},
@@ -89,7 +87,7 @@ class MikroTikConnectionService:
             ms = info.get("response_ms") or int((time.perf_counter() - t0) * 1000)
             for st in steps:
                 st["ok"] = True
-            steps[0]["detail"] = f"{router['host']}:{router['api_ssl_port'] if router.get('ssl_enabled') else router['api_port']} ({'API-SSL' if router.get('ssl_enabled') else 'API'})"
+            steps[0]["detail"] = f"{router['host']}:{router.get('api_port', 8728)} (API)"
             steps[1]["detail"] = f"user {router.get('username')}"
             steps[2]["detail"] = info["identity"]
             steps[3]["detail"] = info["version"]
