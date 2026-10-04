@@ -1,0 +1,275 @@
+{
+  "theme": "dark_default_with_toggle",
+  "theme_strategy": {
+    "default_mode": "dark",
+    "rationale": "Network operations / ISP NOC dashboards and MikroTik monitoring tools (Winbox, Dude, modern NOC consoles) are predominantly used in dark mode for prolonged monitoring sessions, reducing eye strain while highlighting status LEDs (green online, red offline/isolir, amber connecting). High visual contrast with slate/obsidian surfaces and vivid status pills.",
+    "toggle_supported": true
+  },
+  "fonts": {
+    "heading": "Outfit Variable",
+    "heading_import": "@fontsource-variable/outfit",
+    "body": "Plus Jakarta Sans Variable",
+    "body_import": "@fontsource-variable/plus-jakarta-sans",
+    "mono": "JetBrains Mono Variable",
+    "mono_import": "@fontsource-variable/jetbrains-mono",
+    "typography_rules": {
+      "headline_tracking": "tracking-tight",
+      "labels_and_badges": "uppercase tracking-[0.15em] text-xs font-semibold",
+      "code_and_ips": "font-mono text-xs sm:text-sm tracking-normal",
+      "currency_numbers": "font-mono font-bold tracking-tight text-emerald-400"
+    }
+  },
+  "typography": {
+    "scale_px": {
+      "display": 48,
+      "h1": 36,
+      "h2": 28,
+      "h3": 20,
+      "body": 15,
+      "caption": 13
+    }
+  },
+  "colors": {
+    "surfaces": [
+      {
+        "name": "page",
+        "kind": "solid",
+        "bg": "#0B0F17",
+        "on_bg": "#F1F5F9",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "link": "#38BDF8",
+          "error": "#F87171",
+          "success": "#34D399",
+          "warning": "#FBBF24"
+        }
+      },
+      {
+        "name": "sidebar",
+        "kind": "solid",
+        "bg": "#070A10",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#64748B",
+        "roles": {
+          "active_item": "#0284C7",
+          "active_text": "#FFFFFF",
+          "badge": "#0369A1"
+        }
+      },
+      {
+        "name": "panel",
+        "kind": "solid",
+        "bg": "#111827",
+        "on_bg": "#F9FAFB",
+        "on_bg_muted": "#9CA3AF",
+        "roles": {
+          "border": "#1F2937",
+          "link": "#38BDF8",
+          "error": "#EF4444",
+          "success": "#10B981"
+        }
+      },
+      {
+        "name": "card_elevated",
+        "kind": "solid",
+        "bg": "#161F30",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8"
+      },
+      {
+        "name": "top_header",
+        "kind": "glass",
+        "contrast_against": "#0B0F17",
+        "guarantee": "backdrop-blur-xl bg-[#0B0F17]/85 border-b border-slate-800/80",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8"
+      },
+      {
+        "name": "receipt_surface",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#64748B",
+        "roles": {
+          "brand_dark": "#0369A1",
+          "paid_stamp": "#059669",
+          "border_receipt": "#CBD5E1"
+        }
+      },
+      {
+        "name": "status_badge_active",
+        "kind": "solid",
+        "bg": "#064E3B",
+        "on_bg": "#34D399",
+        "on_bg_muted": "#6EE7B7"
+      },
+      {
+        "name": "status_badge_isolir",
+        "kind": "solid",
+        "bg": "#7F1D1D",
+        "on_bg": "#F87171",
+        "on_bg_muted": "#FCA5A5"
+      },
+      {
+        "name": "status_badge_menunggak",
+        "kind": "solid",
+        "bg": "#78350F",
+        "on_bg": "#FBBF24",
+        "on_bg_muted": "#FDE68A"
+      },
+      {
+        "name": "status_badge_connecting",
+        "kind": "solid",
+        "bg": "#1E3A8A",
+        "on_bg": "#60A5FA",
+        "on_bg_muted": "#93C5FD"
+      }
+    ],
+    "accent": "#0284C7",
+    "on_accent": "#FFFFFF"
+  },
+  "entry_surfaces": {
+    "/login": "split branded login — left high-contrast ISP NOC brand & operational overview panel, right authentication card with role switcher quick test",
+    "/": "admin command shell with collapsible navigation, top metric ribbon, real-time router status pill, and dense KPI grid"
+  },
+  "visual_enhancers": {
+    "card_borders": "1px solid rgba(255, 255, 255, 0.08)",
+    "active_glow": "shadow-[0_0_15px_rgba(2,132,199,0.25)]",
+    "status_pulse": "relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 animate-ping opacity-75",
+    "grid_density": "Mode B high density grid with tight gaps (gap-3.5 to gap-4.5) for technical NOC clarity",
+    "table_styling": "dense rows with font-mono for IP/MAC/INV numbers, hover row highlight bg-slate-800/50, sticky table headers"
+  },
+  "component_structure": {
+    "layout_components": [
+      {
+        "name": "AppShell",
+        "path": "frontend/src/components/layout/AppShell.tsx",
+        "description": "Main application shell with responsive sidebar, top NOC header, role badge, quick search, router live status widget, and notifications"
+      },
+      {
+        "name": "SidebarNav",
+        "path": "frontend/src/components/layout/SidebarNav.tsx",
+        "description": "RBAC filtered sidebar with categorized links: Operasional, Billing & Kas, Jaringan & MikroTik, Lapangan & PSB, Laporan & Audit, Pengaturan"
+      },
+      {
+        "name": "TechnicianMobileHeader",
+        "path": "frontend/src/components/layout/TechnicianMobileNav.tsx",
+        "description": "Bottom navigation bar and quick action drawer for Teknisi on smartphone view"
+      }
+    ],
+    "feature_modules": [
+      {
+        "module": "Dashboard",
+        "path": "frontend/src/pages/Dashboard.tsx",
+        "description": "KPI cards (Pelanggan Total/Aktif/Isolir/Menunggak, Omset Hari Ini & Bulan Ini, Tagihan Unpaid/Paid, Router Status, PPPoE online/offline), Trend charts, Recent actions stream, Quick actions"
+      },
+      {
+        "module": "Customers (Pelanggan)",
+        "path": "frontend/src/pages/Customers.tsx",
+        "description": "Customer list with PPPoE secret, IP Static/Dynamic, ODP location, Paket, Status (Aktif/Isolir/Suspend), Auto-isolir toggle, Quick isolir/aktifkan button via MikroTik API, Export CSV/Excel"
+      },
+      {
+        "module": "Packages (Paket Internet)",
+        "path": "frontend/src/pages/Packages.tsx",
+        "description": "Internet package manager with MikroTik PPP profile mapping, rate limit (e.g. 20M/20M), price (IDR), isolir profile, active subscriber counts"
+      },
+      {
+        "module": "Billing & Invoices (Tagihan & Faktur)",
+        "path": "frontend/src/pages/Invoices.tsx",
+        "description": "Auto/manual generated invoice INV-GMP-YYYYMM-XXXXXX, status tabs (Semua, Belum Bayar, Lunas, Terlambat, Dibatalkan), bulk generate, reminder WA generator, pay dialog"
+      },
+      {
+        "module": "Payments & Kas (Pembayaran)",
+        "path": "frontend/src/pages/Payments.tsx",
+        "description": "Payment logging (Cash, Transfer Bank BCA/BRI/Mandiri, QRIS/E-Wallet), Struk Pembayaran thermal 58mm / 80mm & A4 PDF preview & print, WA notification direct sender"
+      },
+      {
+        "module": "MikroTik Routers (Router & API)",
+        "path": "frontend/src/pages/Routers.tsx",
+        "description": "MikroTik fleet manager with IP, API Port (8728/8729/REST), Test Connection step-by-step checklist dialog (Ping, Socket, Auth, Fetch Resource), Live CPU/RAM/Uptime badge, Sync profiles/secrets"
+      },
+      {
+        "module": "PPPoE Monitoring (Sesi PPPoE)",
+        "path": "frontend/src/pages/PppoeMonitoring.tsx",
+        "description": "Live PPPoE active sessions list, uptime, caller ID / MAC address, IP address assigned, RX/TX live rate, kick/disconnect session button"
+      },
+      {
+        "module": "MikroTik Action Log & WhatsApp Logs",
+        "path": "frontend/src/pages/Logs.tsx",
+        "description": "Audit trail of every automated/manual MikroTik action (Secret added, disabled, profile changed) and WhatsApp simulated messaging queue & status"
+      },
+      {
+        "module": "Tiket Gangguan (Trouble Tickets)",
+        "path": "frontend/src/pages/Tickets.tsx",
+        "description": "Helpdesk ticketing system: priority (Low/Med/High/Critical), status (Open, In Progress, Resolved, Closed), assigned technician, customer location and history"
+      },
+      {
+        "module": "PSB (Pasang Baru / New Installation)",
+        "path": "frontend/src/pages/PsbInstallations.tsx",
+        "description": "Registration to field installation pipeline (Survey, Jadwal Pasang, Tarik Kabel & Dropcore, ODP Port mapping, Redaman dBm check, Aktivasi Router, Selesai)"
+      },
+      {
+        "module": "Map & ODP (Peta Jaringan)",
+        "path": "frontend/src/pages/NetworkMap.tsx",
+        "description": "Interactive Leaflet map showing ODP distribution boxes (capacity used/free), active customers, red isolir customers, technicians in field, pending PSB, and open tickets"
+      },
+      {
+        "module": "Reports & Keuangan (Laporan)",
+        "path": "frontend/src/pages/Reports.tsx",
+        "description": "Financial & operational reporting: Laporan Pendapatan, Laporan Tunggakan, Laporan Pertumbuhan Pelanggan, Laporan Aktivitas Teknisi, Export Excel/PDF"
+      },
+      {
+        "module": "Settings & Audit (Pengaturan & Audit)",
+        "path": "frontend/src/pages/Settings.tsx",
+        "description": "ISP company profile (NETWORK GMP), WhatsApp gateway config (Fonnte/Wablas/Custom webhook), Auto Isolir schedule & grace period, MikroTik API defaults, User & RBAC roles"
+      }
+    ]
+  },
+  "rbac_roles": {
+    "Super Admin": {
+      "access": "Full access to all modules, settings, router secrets, logs, deletion"
+    },
+    "Admin": {
+      "access": "Customer management, invoices, payments, tickets, PSB, PPPoE monitoring"
+    },
+    "Finance": {
+      "access": "Billing, Invoices, Payments, Financial Reports, Customer payment status"
+    },
+    "CS": {
+      "access": "Customer service, create tickets, view customer status, register PSB, send WA payment reminders"
+    },
+    "Teknisi": {
+      "access": "Mobile-optimized view: My Work Orders, PSB tasks, Ticket assignments, Test ODP redaman dBm, Customer location map"
+    },
+    "Supervisor": {
+      "access": "Read-only analytics, technician performance, network uptime overview, audit logs"
+    }
+  },
+  "motion_and_interactions": {
+    "page_transitions": "opacity: 0 to 1 with slight Y translation (y: 6 to 0, duration: 0.18s)",
+    "modal_dialogs": "scale from 0.96 to 1 with backdrop blur",
+    "test_connection_stepper": "animated checkmarks and spinner icons for each sequential diagnostic step",
+    "metric_counters": "smooth value updates with subtle green/red flash on real-time sync"
+  },
+  "accessibility_and_contrast": {
+    "wcag_compliance": "WCAG AA standard with all normal text exceeding 4.5:1 against dark slate surfaces (#F1F5F9 on #0B0F17 = 15.2:1)",
+    "status_contrast": "Every colored status pill uses dark tinted bg with high-luminance text (e.g. #34D399 on #064E3B = 6.4:1; #F87171 on #7F1D1D = 5.2:1)",
+    "focus_states": "focus:ring-2 focus:ring-sky-500 focus:outline-none focus:ring-offset-2 focus:ring-offset-slate-900"
+  },
+  "instructions_to_main_agent": [
+    "1. Language is strictly Bahasa Indonesia throughout the entire UI (e.g. 'Pelanggan', 'Tagihan', 'Lunas', 'Belum Bayar', 'Terlambat', 'Isolir', 'Paket Internet', 'Tiket Gangguan', 'Pasang Baru (PSB)', 'Uji Koneksi MikroTik', 'Sesi PPPoE Aktif', 'Cetak Struk').",
+    "2. Setup Leaflet with 'yarn add leaflet @types/leaflet' in frontend directory before building NetworkMap component. Include Leaflet CSS import.",
+    "3. Provide realistic Indonesian ISP / RT RW Net seed data: Routerboards (RB450Gx4, CCR1009, RB750Gr3, CCR2004), realistic IP addresses (10.20.0.x, 192.168.88.1), ODP codes (ODP-GMP-01/08), rupiah amounts (Rp 150.000, Rp 250.000, Rp 350.000), Indonesian customer names and addresses.",
+    "4. Implement simulated live MikroTik API actions: 'Uji Koneksi' (Test Connection with 4 sequential verified steps), 'Isolir Pelanggan' (changes profile to 'ISOLIR' & disconnects PPPoE active session), 'Aktifkan Kembali' (restores normal profile), 'Sinkronkan Data MikroTik'.",
+    "5. Implement printable & downloadable thermal receipt dialog (format 58mm/80mm) with QR code & WA sharing template text.",
+    "6. Include Role Switcher dropdown in the top header or quick role selector on Login page so evaluators can seamlessly experience Super Admin, Admin, Finance, CS, and Teknisi views.",
+    "7. All buttons, tables, filters, and action icons MUST have kebab-case data-testid attributes (e.g. data-testid='customer-add-btn', data-testid='invoice-filter-status', data-testid='mikrotik-test-conn-btn')."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Avoid generic centered layouts; use dense technical Bento/NOC grid system with crisp borders and subtle dark card elevations.",
+    "Never use pure black #000000; use rich deep slate #0B0F17 with navy undertones.",
+    "Ensure all monetary values use Indonesian Rupiah format: 'Rp 150.000' and numbers formatted with locale 'id-ID'.",
+    "Ensure MikroTik action log and WhatsApp notifications are clearly visible and interactive to demonstrate the simulated automation capabilities.",
+    "Use sonner for instant toast feedback after any action (e.g. 'Pelanggan berhasil di-isolir di MikroTik Router-Utama')."
+  ]
+}
