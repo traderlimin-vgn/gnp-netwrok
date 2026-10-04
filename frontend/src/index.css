@@ -157,3 +157,9 @@
   .print-area, .print-area * { visibility: visible; }
   .print-area { position: absolute; left: 0; top: 0; width: 100%; }
 }
+
+/* Network map: cable-cut + fault pulse */
+@keyframes gmp-dash { to { stroke-dashoffset: -28; } }
+@keyframes gmp-pulse { 0%, 100% { stroke-opacity: 0.9; fill-opacity: 0.18; } 50% { stroke-opacity: 0.25; fill-opacity: 0.04; } }
+.gmp-cable-cut { animation: gmp-dash 0.9s linear infinite; }
+.gmp-fault-pulse { animation: gmp-pulse 1.6s ease-in-out infinite; }

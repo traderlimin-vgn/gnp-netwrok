@@ -31,3 +31,9 @@ Direct connection only: Host/IP publik + Port API (default 8728, plain API). No 
 backend/integrations/genieacs: IGenieAcsProvider (base.py), GenieAcsNbiProvider (nbi_provider.py, httpx → NBI :7557, vendor param paths for RX/TX power, PPPoE, SSID, WiFi key), GenieAcsSimulator (**MOCKED**, collection acs_sim_devices), GenieAcsService (config in settings doc _id "genieacs", password encrypted, device↔customer mapping: manual acs_links else auto by PPPoE username, online = last inform within online_minutes).
 Endpoints: GET/PUT /api/genieacs/config, POST /api/genieacs/test, GET /api/genieacs/devices?q&status&customer_id, POST /api/genieacs/devices/{id}/wifi|reboot|refresh (DONE|QUEUED), PUT /api/genieacs/devices/{id}/link. All actions audited.
 UI: GenieACS / ONT page, Settings → GenieACS tab (mode simulator/nbi, URL, user/pass, test), customer detail shows ONT section.
+
+## Peta Jaringan ↔ GenieACS (fault localisation)
+Customers have `odp_id/odp_name` (form select; empty = auto nearest ODP by coordinates). Topology: OLT/POP → ODC → ODP → customer (drop cable lines on map).
+services/network_faults.py `analyze()`: ONT state per customer (online / weak RX < -27 / offline). ODP down if ≥2 ONT and ≥60% offline; warning if ≥30% offline or ≥2 weak. ODC (feeder) down if ≥2 ODPs and ≥50% of its ODPs down. Single offline ONT on healthy ODP → "drop" fault.
+Endpoints: GET /api/network/faults (FaultReport: faults, odps, odcs, onts), POST /api/network/faults/simulate {odp_id, cut} (simulator mode only, demo LOS).
+Map: ONT colours per house, red animated cable on cut segment, pulsing fault circle, side panel "Dugaan Gangguan Kabel" with Lokasi / Google Maps / Buat Tiket (ticket critical with affected customers).

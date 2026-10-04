@@ -170,7 +170,7 @@ async def map_points(_: dict = Depends(require("map.view"))):
     pts: list[dict] = []
     async for c in db.customers.find({"latitude": {"$ne": None}}, {"_id": 0}):
         pts.append({"id": c["id"], "type": "customer", "name": c["name"], "latitude": c["latitude"], "longitude": c["longitude"],
-                    "status": c["status"], "info": f"{c['customer_code']} · {c.get('package_name', '')} · {c.get('pppoe_username', '')}"})
+                    "status": c["status"], "info": f"{c['customer_code']} · {c.get('package_name', '')} · {c.get('pppoe_username', '')} · {c.get('odp_name', '')}", "parent_id": c.get("odp_id", "")})
     async for a in db.map_assets.find({}, {"_id": 0}):
         pts.append({"id": a["id"], "type": a["type"], "name": a["name"], "latitude": a["latitude"], "longitude": a["longitude"],
                     "info": f"Kapasitas {a.get('used', 0)}/{a.get('capacity', 0)}", "parent_id": a.get("parent_id", "")})

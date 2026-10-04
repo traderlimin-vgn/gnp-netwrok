@@ -1,10 +1,13 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from "react-leaflet";
-import { PageHeader } from "@/components/common";
-import { apiGet } from "@/lib/api";
-import { mapsUrl } from "@/lib/format";
-import type { MapPoint } from "@/lib/types";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, Tooltip as LTooltip, useMap } from "react-leaflet";
+import { AlertTriangle, Crosshair, RefreshCw, Scissors, Wrench } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { NSelect, PageHeader, StatusBadge } from "@/components/common";
+import { apiGet, apiPost, errMsg } from "@/lib/api";
+import { can, fmtDate, mapsUrl, useMe } from "@/lib/format";
+import type { AcsConfig, Fault, FaultReport, MapPoint, Ticket } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const LAYERS: { type: MapPoint["type"] | "cable"; label: string; color: string; radius: number }[] = [
@@ -17,18 +20,85 @@ const LAYERS: { type: MapPoint["type"] | "cable"; label: string; color: string; 
   { type: "ticket", label: "Tiket", color: "#EF4444", radius: 8 },
   { type: "cable", label: "Kabel", color: "#64748B", radius: 0 },
 ];
-const STATUS_FILL: Record<string, string> = { isolir: "#EF4444", suspend: "#F59E0B", stopped: "#64748B" };
+const ONT_COLOR: Record<string, string> = { online: "#10B981", weak: "#F59E0B", offline: "#EF4444" };
+const SEV_COLOR: Record<string, string> = { ok: "#64748B", warning: "#F59E0B", down: "#EF4444" };
+
+function FlyTo({ target }: { target: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => { if (target) map.flyTo(target, 16, { duration: 0.8 }); }, [map, target]);
+  return null;
+}
+
+function FaultCard({ f, onFocus }: { f: Fault; onFocus: () => void }) {
+  const qc = useQueryClient();
+  const { data: me } = useMe();
+  const ticket = useMutation({
+    mutationFn: () => apiPost<Ticket>("/tickets", {
+      customer_id: f.affected[0].customer_id, priority: f.severity === "down" ? "critical" : "high", technician_id: "",
+      complaint: `${f.title}. ${f.message}. Segmen: ${f.segment}. Pelanggan terdampak: ${f.affected.map((a) => a.customer_code).join(", ")}`,
+      notes: `Lokasi: ${mapsUrl(f.latitude, f.longitude)}`,
+    }),
+    onSuccess: (t) => { toast.success(`${t.ticket_no} dibuat${t.technician_name ? ` · WA ke ${t.technician_name}` : ""}`); qc.invalidateQueries({ queryKey: ["tickets"] }); qc.invalidateQueries({ queryKey: ["map-points"] }); },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  return (
+    <div data-testid={`fault-card-${f.id}`} className={cn("animate-rise rounded-lg border p-3 text-xs", f.severity === "down" ? "border-red-500/40 bg-red-500/[0.07]" : "border-amber-500/30 bg-amber-500/[0.05]")}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-semibold text-foreground">{f.title}</div>
+        <StatusBadge value={f.severity === "down" ? "offline" : "pending"} label={f.level.toUpperCase()} />
+      </div>
+      <div className="mt-1 font-mono text-sky-300">{f.segment}</div>
+      <div className="mt-1 text-muted-foreground">{f.message}</div>
+      <div className="mt-1 text-muted-foreground">Terdampak: {f.affected.slice(0, 4).map((a) => a.customer_name).join(", ")}{f.affected_count > 4 && ` +${f.affected_count - 4}`}</div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <Button size="xs" variant="outline" onClick={onFocus} data-testid={`fault-focus-${f.id}`}><Crosshair className="h-3.5 w-3.5" />Lokasi</Button>
+        <a href={mapsUrl(f.latitude, f.longitude)} target="_blank" rel="noreferrer"><Button size="xs" variant="outline">Google Maps</Button></a>
+        {can(me, "tickets.write") && <Button size="xs" onClick={() => ticket.mutate()} disabled={ticket.isPending} data-testid={`fault-ticket-${f.id}`}><Wrench className="h-3.5 w-3.5" />Buat Tiket</Button>}
+      </div>
+    </div>
+  );
+}
 
 export default function NetworkMap() {
+  const qc = useQueryClient();
+  const { data: me } = useMe();
   const { data = [] } = useQuery({ queryKey: ["map-points"], queryFn: () => apiGet<MapPoint[]>("/map/points") });
+  const { data: report, error: faultErr, isFetching, refetch } = useQuery({ queryKey: ["network-faults"], queryFn: () => apiGet<FaultReport>("/network/faults"), refetchInterval: 60_000, retry: false });
+  const { data: acsCfg } = useQuery({ queryKey: ["acs-config"], queryFn: () => apiGet<AcsConfig>("/genieacs/config"), enabled: can(me, "mikrotik.view") });
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [target, setTarget] = useState<[number, number] | null>(null);
+  const [simOdp, setSimOdp] = useState("");
   const toggle = (t: string) => setHidden((h) => { const n = new Set(h); if (n.has(t)) n.delete(t); else n.add(t); return n; });
   const byId = useMemo(() => new Map(data.map((p) => [p.id, p])), [data]);
+  const ont = useMemo(() => new Map((report?.onts ?? []).map((o) => [o.customer_id, o])), [report]);
+  const odpSev = useMemo(() => new Map((report?.odps ?? []).map((o) => [o.odp_id, o])), [report]);
+  const odcSev = useMemo(() => new Map((report?.odcs ?? []).map((o) => [o.odc_id, o])), [report]);
   const center: [number, number] = data.length ? [data.reduce((a, p) => a + p.latitude, 0) / data.length, data.reduce((a, p) => a + p.longitude, 0) / data.length] : [-7.41, 112.6];
   const cables = data.filter((p) => p.parent_id && byId.has(p.parent_id));
+  const faults = report?.faults ?? [];
+  const down = faults.filter((f) => f.severity === "down");
+  const sim = useMutation({
+    mutationFn: (cut: boolean) => apiPost<{ odp_name: string; onts: number; cut: boolean }>("/network/faults/simulate", { odp_id: simOdp, cut }),
+    onSuccess: (r) => { toast.success(`${r.cut ? "Simulasi putus kabel" : "Kabel dipulihkan"} di ${r.odp_name} (${r.onts} ONT)`); qc.invalidateQueries({ queryKey: ["network-faults"] }); qc.invalidateQueries({ queryKey: ["acs-devices"] }); },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+
+  const cableStyle = (p: MapPoint) => {
+    if (p.type === "customer") {
+      const o = ont.get(p.id);
+      const bad = o?.ont_status === "offline";
+      return { color: bad ? "#EF4444" : "#475569", weight: bad ? 2 : 1, dashArray: "2 4", opacity: bad ? 0.9 : 0.5 };
+    }
+    const sev = p.type === "odp" ? odpSev.get(p.id)?.severity : undefined;
+    const parentDown = odcSev.get(p.parent_id)?.severity === "down";
+    const c = parentDown || sev === "down" ? "#EF4444" : sev === "warning" ? "#F59E0B" : "#64748B";
+    return { color: c, weight: c === "#EF4444" ? 4 : 2, dashArray: c === "#EF4444" ? "8 6" : "4 4", className: c === "#EF4444" ? "gmp-cable-cut" : "" };
+  };
+
   return (
     <div>
-      <PageHeader eyebrow="Lapangan" title="Peta Jaringan" subtitle="Leaflet + OpenStreetMap: pelanggan, ODP, ODC, router, teknisi, PSB, tiket dan jalur kabel." />
+      <PageHeader eyebrow="Lapangan" title="Peta Jaringan" subtitle="Leaflet + OpenStreetMap terhubung GenieACS: status ONT tiap rumah, kesehatan ODP/ODC, dan lokasi dugaan putus kabel."
+        actions={<Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching} data-testid="map-refresh-faults"><RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />Analisa Ulang</Button>} />
       <div className="mb-3 flex flex-wrap gap-2" data-testid="map-layer-toggles">
         {LAYERS.map((l) => {
           const count = l.type === "cable" ? cables.length : data.filter((p) => p.type === l.type).length;
@@ -39,34 +109,76 @@ export default function NetworkMap() {
             </button>
           );
         })}
+        <span className="ml-auto flex items-center gap-3 text-[11px] text-muted-foreground">
+          ONT: <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" />online</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" />redaman tinggi</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" />LOS/offline</span>
+        </span>
       </div>
-      <div className="h-[calc(100vh-14rem)] min-h-[420px] overflow-hidden rounded-xl border" data-testid="network-map">
-        {data.length > 0 && (
-          <MapContainer center={center} zoom={13} className="h-full w-full" scrollWheelZoom>
-            <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            {!hidden.has("cable") && cables.map((p) => {
-              const parent = byId.get(p.parent_id)!;
-              return <Polyline key={`c-${p.id}`} positions={[[p.latitude, p.longitude], [parent.latitude, parent.longitude]]} pathOptions={{ color: "#64748B", weight: 2, dashArray: "4 4" }} />;
-            })}
-            {data.filter((p) => !hidden.has(p.type)).map((p) => {
-              const l = LAYERS.find((x) => x.type === p.type)!;
-              const fill = p.type === "customer" ? STATUS_FILL[p.status] ?? l.color : p.type === "router" && p.status === "offline" ? "#EF4444" : l.color;
-              return (
-                <CircleMarker key={`${p.type}-${p.id}`} center={[p.latitude, p.longitude]} radius={l.radius}
-                  pathOptions={{ color: p.type === "router" || p.type === "odc" ? "#fff" : fill, weight: p.type === "router" || p.type === "odc" ? 2 : 1, fillColor: fill, fillOpacity: 0.85 }}>
-                  <Popup>
-                    <div className="text-xs">
-                      <div className="font-semibold">{p.name}</div>
-                      <div className="uppercase text-slate-500">{l.label}{p.status && ` · ${p.status}`}</div>
-                      <div>{p.info}</div>
-                      <a href={mapsUrl(p.latitude, p.longitude)} target="_blank" rel="noreferrer">Buka Google Maps</a>
-                    </div>
-                  </Popup>
+      <div className="grid gap-3 xl:grid-cols-[1fr_340px]">
+        <div className="h-[calc(100vh-15rem)] min-h-[440px] overflow-hidden rounded-xl border" data-testid="network-map">
+          {data.length > 0 && (
+            <MapContainer center={center} zoom={13} className="h-full w-full" scrollWheelZoom>
+              <FlyTo target={target} />
+              <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              {!hidden.has("cable") && cables.map((p) => {
+                const parent = byId.get(p.parent_id)!;
+                return <Polyline key={`c-${p.id}`} positions={[[p.latitude, p.longitude], [parent.latitude, parent.longitude]]} pathOptions={cableStyle(p)} />;
+              })}
+              {faults.filter((f) => f.severity === "down").map((f) => (
+                <CircleMarker key={`f-${f.id}`} center={[f.latitude, f.longitude]} radius={22} pathOptions={{ color: "#EF4444", weight: 2, fillColor: "#EF4444", fillOpacity: 0.15, className: "gmp-fault-pulse" }}>
+                  <LTooltip direction="top" permanent className="!text-[10px] !font-semibold">⚠ {f.segment}</LTooltip>
                 </CircleMarker>
-              );
-            })}
-          </MapContainer>
-        )}
+              ))}
+              {data.filter((p) => !hidden.has(p.type)).map((p) => {
+                const l = LAYERS.find((x) => x.type === p.type)!;
+                const o = p.type === "customer" ? ont.get(p.id) : undefined;
+                const sev = p.type === "odp" ? odpSev.get(p.id) : p.type === "odc" ? odcSev.get(p.id) : undefined;
+                const fill = o ? ONT_COLOR[o.ont_status] : sev && sev.severity !== "ok" ? SEV_COLOR[sev.severity] : p.type === "router" && p.status === "offline" ? "#EF4444" : l.color;
+                const ring = p.type === "router" || p.type === "odc" || p.type === "odp";
+                return (
+                  <CircleMarker key={`${p.type}-${p.id}`} center={[p.latitude, p.longitude]} radius={l.radius}
+                    pathOptions={{ color: ring ? (sev && sev.severity !== "ok" ? SEV_COLOR[sev.severity] : "#fff") : fill, weight: ring ? 2 : 1, fillColor: p.type === "odp" || p.type === "odc" ? l.color : fill, fillOpacity: 0.9 }}>
+                    <Popup>
+                      <div className="text-xs">
+                        <div className="font-semibold">{p.name}</div>
+                        <div className="uppercase text-slate-500">{l.label}{p.status && ` · ${p.status}`}</div>
+                        <div>{p.info}</div>
+                        {o && <div>ONT {o.serial}: <b style={{ color: ONT_COLOR[o.ont_status] }}>{o.ont_status === "offline" ? "LOS / offline" : o.ont_status}</b> · RX {o.rx_power ?? "-"} dBm</div>}
+                        {sev && "total" in sev && <div>ONT: {sev.online} online · {sev.weak} redaman · <b>{sev.offline} offline</b> / {sev.total}</div>}
+                        {sev && "odps_total" in sev && <div>ODP down: {sev.odps_down}/{sev.odps_total}</div>}
+                        <a href={mapsUrl(p.latitude, p.longitude)} target="_blank" rel="noreferrer">Buka Google Maps</a>
+                      </div>
+                    </Popup>
+                  </CircleMarker>
+                );
+              })}
+            </MapContainer>
+          )}
+        </div>
+        <aside className="flex max-h-[calc(100vh-15rem)] min-h-[440px] flex-col rounded-xl border bg-card" data-testid="fault-panel">
+          <div className="border-b px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-semibold"><AlertTriangle className="h-4 w-4 text-red-400" />Dugaan Gangguan Kabel</div>
+            <div className="mt-1 text-[11px] text-muted-foreground" data-testid="fault-summary">
+              {report ? <>{down.length} putus · {faults.length - down.length} peringatan · analisa {fmtDate(report.generated_at, true)}</> : "Menganalisa data GenieACS…"}
+            </div>
+          </div>
+          <div className="flex-1 space-y-2 overflow-y-auto p-3">
+            {faultErr && <div className="rounded-lg bg-red-500/10 p-3 text-xs text-red-300" data-testid="fault-error">{errMsg(faultErr)}</div>}
+            {report && faults.length === 0 && <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-300" data-testid="fault-none">Semua jalur kabel normal — tidak ada ONT LOS massal.</div>}
+            {faults.map((f) => <FaultCard key={f.id} f={f} onFocus={() => setTarget([f.latitude, f.longitude])} />)}
+          </div>
+          {acsCfg?.mode === "simulator" && can(me, "mikrotik.control") && (
+            <div className="border-t p-3" data-testid="fault-simulator">
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Demo: simulasi putus kabel</div>
+              <div className="flex gap-1.5">
+                <NSelect value={simOdp} onChange={setSimOdp} options={(report?.odps ?? []).filter((o) => o.total).map((o) => ({ value: o.odp_id, label: `${o.odp_name} (${o.total} ONT)` }))} placeholder="Pilih ODP" testid="fault-sim-odp-select" className="min-w-0 flex-1" />
+                <Button size="sm" variant="destructive" disabled={!simOdp || sim.isPending} onClick={() => sim.mutate(true)} data-testid="fault-sim-cut"><Scissors className="h-3.5 w-3.5" />Putus</Button>
+                <Button size="sm" variant="outline" disabled={!simOdp || sim.isPending} onClick={() => sim.mutate(false)} data-testid="fault-sim-restore">Pulih</Button>
+              </div>
+            </div>
+          )}
+        </aside>
       </div>
     </div>
   );

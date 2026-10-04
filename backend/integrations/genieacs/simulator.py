@@ -40,15 +40,24 @@ class GenieAcsSimulator(IGenieAcsProvider):
         await self._ensure()
         out = []
         async for d in db.acs_sim_devices.find({}, {"_id": 0}):
-            offline = d.pop("sim_offline", False)
+            cut = d.pop("sim_cut", False)
+            offline = d.pop("sim_offline", False) or cut
             d.pop("boot_at", None)
             d["last_inform"] = _ago(random.randint(4 * 3600, 3 * 86400) if offline else random.randint(5, 240))
             if d["rx_power"] is not None:
                 d["rx_power"] = round(d["rx_power"] + random.uniform(-0.15, 0.15), 2)
             if offline:
                 d["wifi_clients"] = 0
+            if cut:
+                d["rx_power"] = None  # LOS — no optical signal
             out.append(d)
         return out
+
+    @staticmethod
+    async def set_cut(pppoe_usernames: list[str], cut: bool) -> int:
+        """Demo only: simulate a fibre cut (LOS) on every ONT behind an ODP."""
+        r = await db.acs_sim_devices.update_many({"pppoe_username": {"$in": pppoe_usernames}}, {"$set": {"sim_cut": cut}})
+        return r.matched_count
 
     async def _get(self, device_id: str) -> dict:
         d = await db.acs_sim_devices.find_one({"id": device_id}, {"_id": 0})

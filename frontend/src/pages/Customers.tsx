@@ -12,12 +12,12 @@ import { ConfirmButton, FilterBar, KV, Modal, Tbl } from "@/components/kit";
 import { apiDelete, apiGet, apiPost, apiPut, errMsg } from "@/lib/api";
 import { can, CUSTOMER_STATUS, exportCsv, fmtBps, fmtDate, mapsUrl, rupiah, useMe } from "@/lib/format";
 import { fmtUptime, rxTone, useAcsAction, WifiDialog } from "./Acs";
-import type { AcsDevice, ActionResult, Customer, CustomerIn, CustomerSaveResult, Package, Paged, Router, User } from "@/lib/types";
+import type { AcsDevice, ActionResult, MapPoint, Customer, CustomerIn, CustomerSaveResult, Package, Paged, Router, User } from "@/lib/types";
 
 const EMPTY: CustomerIn = {
   name: "", whatsapp: "", alt_phone: "", address: "", rt: "", rw: "", village: "", district: "", city: "Sidoarjo", province: "Jawa Timur",
   latitude: null, longitude: null, package_id: "", install_date: new Date().toISOString().slice(0, 10), due_day: 10, status: "active",
-  technician_id: "", notes: "", router_id: "", pppoe_username: "", pppoe_password: "", service: "pppoe", comment: "", create_pppoe: true,
+  technician_id: "", notes: "", odp_id: "", router_id: "", pppoe_username: "", pppoe_password: "", service: "pppoe", comment: "", create_pppoe: true,
 };
 const STATUS_OPTS = Object.entries(CUSTOMER_STATUS).map(([value, label]) => ({ value, label }));
 
@@ -25,7 +25,7 @@ function toForm(c: Customer): CustomerIn {
   return {
     name: c.name, whatsapp: c.whatsapp, alt_phone: c.alt_phone, address: c.address, rt: c.rt, rw: c.rw, village: c.village, district: c.district,
     city: c.city, province: c.province, latitude: c.latitude, longitude: c.longitude, package_id: c.package_id, install_date: c.install_date,
-    due_day: c.due_day, status: c.status as CustomerIn["status"], technician_id: c.technician_id, notes: c.notes, router_id: c.router_id,
+    due_day: c.due_day, status: c.status as CustomerIn["status"], technician_id: c.technician_id, notes: c.notes, odp_id: c.odp_id, router_id: c.router_id,
     pppoe_username: c.pppoe_username, pppoe_password: "", service: c.service || "pppoe", comment: c.comment, create_pppoe: !c.mikrotik_id,
   };
 }
@@ -34,12 +34,13 @@ export function useRefs() {
   const packages = useQuery({ queryKey: ["packages"], queryFn: () => apiGet<Package[]>("/packages") });
   const routers = useQuery({ queryKey: ["routers"], queryFn: () => apiGet<Router[]>("/mikrotik/routers"), retry: false });
   const techs = useQuery({ queryKey: ["technicians"], queryFn: () => apiGet<User[]>("/technicians") });
-  return { packages: packages.data ?? [], routers: routers.data ?? [], techs: techs.data ?? [] };
+  const points = useQuery({ queryKey: ["map-points"], queryFn: () => apiGet<MapPoint[]>("/map/points") });
+  return { packages: packages.data ?? [], routers: routers.data ?? [], techs: techs.data ?? [], odps: (points.data ?? []).filter((p) => p.type === "odp") };
 }
 
 function CustomerForm({ initial, editing, onClose }: { initial: CustomerIn; editing: Customer | null; onClose: () => void }) {
   const qc = useQueryClient();
-  const { packages, routers, techs } = useRefs();
+  const { packages, routers, techs, odps } = useRefs();
   const [f, setF] = useState<CustomerIn>(initial);
   const set = <K extends keyof CustomerIn>(k: K, v: CustomerIn[K]) => setF((p) => ({ ...p, [k]: v }));
   const save = useMutation({
@@ -86,7 +87,8 @@ function CustomerForm({ initial, editing, onClose }: { initial: CustomerIn; edit
           <Field label="Paket internet *"><NSelect value={f.package_id} onChange={(v) => set("package_id", v)} options={packages.filter((p) => p.active || p.id === f.package_id).map((p) => ({ value: p.id, label: p.name }))} placeholder="— Pilih paket —" testid="customer-package-select" /></Field>
           <Field label="Harga paket"><Input readOnly value={pkg ? rupiah(pkg.price) : "-"} className="font-mono" data-testid="customer-price-display" /></Field>
           <Field label="Tgl jatuh tempo (1-28)"><Input type="number" min={1} max={28} value={f.due_day} onChange={(e) => set("due_day", Number(e.target.value))} data-testid="customer-dueday-input" /></Field>
-          <Field label="Catatan" className="sm:col-span-3"><Textarea rows={2} value={f.notes} onChange={(e) => set("notes", e.target.value)} data-testid="customer-notes-input" /></Field>
+          <Field label="ODP (titik distribusi)" hint="Kosong = otomatis ODP terdekat dari koordinat"><NSelect value={f.odp_id} onChange={(v) => set("odp_id", v)} options={odps.map((o) => ({ value: o.id, label: o.name }))} placeholder="— Otomatis terdekat —" testid="customer-odp-select" /></Field>
+          <Field label="Catatan" className="sm:col-span-2"><Textarea rows={2} value={f.notes} onChange={(e) => set("notes", e.target.value)} data-testid="customer-notes-input" /></Field>
         </div>
         <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.04] p-3">
           <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-sky-400">MikroTik PPPoE</div>
@@ -178,7 +180,7 @@ function CustomerDetail({ c, onClose, onEdit }: { c: Customer; onClose: () => vo
           <h4 className="mt-5 mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">Data Pelanggan</h4>
           <KV k="WhatsApp" v={c.whatsapp} mono /><KV k="Alternatif" v={c.alt_phone} mono />
           <KV k="Alamat" v={`${c.address} RT ${c.rt}/RW ${c.rw}, ${c.village}, ${c.district}, ${c.city}, ${c.province}`} />
-          <KV k="Koordinat" v={c.latitude != null ? `${c.latitude}, ${c.longitude}` : ""} mono />
+          <KV k="Koordinat" v={c.latitude != null ? `${c.latitude}, ${c.longitude}` : ""} mono /><KV k="ODP" v={c.odp_name} mono />
           <KV k="Paket" v={`${c.package_name} · ${rupiah(c.package_price)}`} />
           <KV k="Tgl pasang" v={fmtDate(c.install_date)} /><KV k="Jatuh tempo" v={`Tanggal ${c.due_day}`} />
           <KV k="Teknisi" v={c.technician_name} /><KV k="Tagihan belum lunas" v={String(c.unpaid_count)} /><KV k="Catatan" v={c.notes} />

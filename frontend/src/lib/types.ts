@@ -21,13 +21,13 @@ export interface CustomerIn {
   name: string; whatsapp: string; alt_phone: string; address: string; rt: string; rw: string; village: string;
   district: string; city: string; province: string; latitude: number | null; longitude: number | null;
   package_id: string; install_date: string; due_day: number; status: CustStatus; technician_id: string; notes: string;
-  router_id: string; pppoe_username: string; pppoe_password: string; service: string; comment: string; create_pppoe: boolean;
+  odp_id: string; router_id: string; pppoe_username: string; pppoe_password: string; service: string; comment: string; create_pppoe: boolean;
 }
 export interface Customer {
   id: string; customer_code: string; name: string; whatsapp: string; alt_phone: string; address: string; rt: string; rw: string;
   village: string; district: string; city: string; province: string; latitude: number | null; longitude: number | null;
   package_id: string; package_name: string; package_price: number; install_date: string; due_day: number; status: string;
-  technician_id: string; technician_name: string; notes: string; router_id: string; router_name: string;
+  technician_id: string; technician_name: string; notes: string; odp_id: string; odp_name: string; router_id: string; router_name: string;
   pppoe_username: string; has_pppoe_password: boolean; pppoe_profile: string; service: string; comment: string; mikrotik_id: string;
   ip_address: string; mac_address: string; connection_status: string; last_online: string | null; last_offline: string | null;
   uptime: string; interface: string; rx_bytes: number; tx_bytes: number; mikrotik_disabled: boolean;
@@ -150,3 +150,13 @@ export interface AcsDevice {
 }
 export interface AcsWifiIn { ssid: string; password: string }
 export interface AcsActionResult { result: "DONE" | "QUEUED"; message: string }
+
+// Network fault localisation — mirrors backend/models/network.py
+export interface OntState { customer_id: string; customer_name: string; customer_code: string; ont_status: "online" | "offline" | "weak"; rx_power: number | null; serial: string }
+export interface Fault {
+  id: string; level: "odc" | "odp" | "drop"; severity: "down" | "warning"; title: string; segment: string; message: string;
+  latitude: number; longitude: number; odp_id: string; odc_id: string; affected: OntState[]; affected_count: number;
+}
+export interface OdpHealth { odp_id: string; odp_name: string; odc_id: string; odc_name: string; latitude: number; longitude: number; total: number; online: number; offline: number; weak: number; severity: "ok" | "warning" | "down" }
+export interface OdcHealth { odc_id: string; odc_name: string; latitude: number; longitude: number; odps_total: number; odps_down: number; severity: "ok" | "warning" | "down" }
+export interface FaultReport { generated_at: string; faults: Fault[]; odps: OdpHealth[]; odcs: OdcHealth[]; onts: OntState[] }

@@ -206,6 +206,12 @@ async def main():
             await db.map_assets.insert_one({"id": uid(), "type": "odp", "name": f"ODP-GMP-{j * 4 + k + 1:02d}", "latitude": la, "longitude": ln,
                                             "capacity": 16, "used": random.randint(4, 16), "parent_id": odc["id"]})
 
+    from services.network_faults import nearest_odp
+    async for c in db.customers.find({}, {"_id": 0, "id": 1, "latitude": 1, "longitude": 1}):
+        o = await nearest_odp(c.get("latitude"), c.get("longitude"))
+        if o:
+            await db.customers.update_one({"id": c["id"]}, {"$set": {"odp_id": o["id"], "odp_name": o["name"]}})
+
     for r in routers[:4]:
         await db.mikrotik_actions.insert_one({"id": uid(), "created_at": now_iso(), "actor": "admin@networkgmp.id", "router_id": r["id"],
                                               "router_name": r["name"], "action": "TEST_CONNECTION", "username": "", "customer_id": "",

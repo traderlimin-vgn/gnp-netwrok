@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from integrations.mikrotik.services import MikroTikCustomerService, MikroTikBillingService, MikroTikError, log_action, MikroTikConnectionService
 from lib.core import uid, now_iso, next_code, audit, paginate, regex_or, clean
 from lib.db import db
+from services.network_faults import nearest_odp
 from lib.security import require, encrypt_secret
 from models.schemas import Customer, CustomerIn, CustomerSaveResult, Package, PackageIn, Paged
 
@@ -24,8 +25,11 @@ async def _denorm(body: CustomerIn) -> dict:
     if body.router_id and not rtr:
         raise HTTPException(422, "Router MikroTik tidak ditemukan")
     data = body.model_dump(exclude={"pppoe_password", "create_pppoe"})
+    odp = await db.map_assets.find_one({"id": body.odp_id, "type": "odp"}) if body.odp_id else await nearest_odp(body.latitude, body.longitude)
+    if body.odp_id and not odp:
+        raise HTTPException(422, "ODP tidak ditemukan")
     data.update(package_name=pkg["name"], package_price=pkg["price"], technician_name=(tech or {}).get("name", ""),
-                router_name=(rtr or {}).get("name", ""))
+                router_name=(rtr or {}).get("name", ""), odp_id=(odp or {}).get("id", ""), odp_name=(odp or {}).get("name", ""))
     if body.pppoe_password:
         data["pppoe_password_enc"] = encrypt_secret(body.pppoe_password)
     return data
