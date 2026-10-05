@@ -1,0 +1,131 @@
+{
+  "iteration": 1,
+  "mode": "generate",
+  "summary": "All 8 acceptance-matrix criteria exercised. Backend suite (18 tests across 8 files) passes; 9 browser checks (8 criteria + 1 public-preview smoke) pass. No bugs found.",
+  "passed": 17,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Login + RBAC: valid super_admin login reaches Dashboard; invalid password rejected; cs sees fewer nav items.",
+      "name": "test_tscheck_login_rbac.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /auth/login superadmin -> 200 role=super_admin; PUT /settings as finance -> 403; POST /auth/login wrong password -> 401."
+    },
+    {
+      "criterion": "Login + RBAC: valid super_admin login reaches Dashboard; invalid password rejected; cs sees fewer nav items.",
+      "name": "login-rbac-dashboard",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "super_admin login -> dashboard stats visible + Settings nav link present; wrong password -> 'Email atau password salah' shown; cs login -> dashboard visible but Settings nav link count=0."
+    },
+    {
+      "criterion": "Dashboard renders stats and charts without errors using seeded data.",
+      "name": "dashboard-stats-charts",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Total Pelanggan, Pendapatan Bulanan chart heading, Status Pelanggan chart heading all visible after login; no console errors beyond an expected transient 401 before auth cookie settles."
+    },
+    {
+      "criterion": "Pelanggan list + search/filter/pagination and detail sheet.",
+      "name": "customers-list-search-detail",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Data Pelanggan heading + GMP-000031 row visible; search 'GMP-000031' filters to Rizky Saputra; clicking row opens detail sheet showing MikroTik section."
+    },
+    {
+      "criterion": "Create a new Pelanggan, optionally with 'Create PPPoE User on MikroTik'.",
+      "name": "customers-create-new-pelanggan",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Empty submit blocked (dialog stays open). Full form incl. router+PPPoE creds submitted -> POST /api/customers 200 {customer_code: GMP-000042, name: tscheck-newcust-...}. Also covered by backend test_tscheck_customer_crud_pppoe.py."
+    },
+    {
+      "criterion": "Create a new Pelanggan, optionally with 'Create PPPoE User on MikroTik'.",
+      "name": "test_tscheck_customer_crud_pppoe.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /customers with create_pppoe=true -> 200, integration_status SUCCESS; POST with missing required field -> 422."
+    },
+    {
+      "criterion": "Tagihan: generate monthly invoices (idempotent) and pay an invoice via pay dialog.",
+      "name": "invoices-generate-and-pay",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "POST /invoices/generate run 1 -> {created:3, skipped:36}; run 2 same period -> {created:0, skipped:39} confirming idempotency. Paid BELUM BAYAR row via dialog -> toast 'Invoice LUNAS' and row status becomes LUNAS."
+    },
+    {
+      "criterion": "Tagihan: generate monthly invoices (idempotent) and pay an invoice via pay dialog.",
+      "name": "test_tscheck_invoices_generate_pay.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /invoices/generate twice for same period -> second run created=0 (idempotent); pay endpoint marks invoice paid."
+    },
+    {
+      "criterion": "Pembayaran: confirm a pending payment; flows to invoice paid and no duplicate side-effects on re-confirm.",
+      "name": "payments-confirm-pending",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created pending payment (unchecked 'Konfirmasi langsung'); found row on /payments; clicked Konfirmasi -> toast 'Pembayaran dikonfirmasi - invoice LUNAS', status badge TERKONFIRMASI."
+    },
+    {
+      "criterion": "Network modules: MikroTik Routers TEST CONNECTION + SYNC, Monitoring PPPoE, GenieACS device list and actions.",
+      "name": "network-routers-pppoe-acs",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Test Connection dialog shows stepwise 'Terhubung ke MikroTik API / Autentikasi berhasil / Router Identity terdeteksi / Versi RouterOS terdeteksi' -> Connected. Sync dialog shows 11 synced/0 created/1 updated/2 skipped/0 failed. PPPoE monitoring table populated with live sessions (GET /mikrotik/pppoe returned rows). GenieACS wifi-change dialog opened for a device with SSID/password fields."
+    },
+    {
+      "criterion": "Network modules: MikroTik Routers TEST CONNECTION + SYNC, Monitoring PPPoE, GenieACS device list and actions.",
+      "name": "test_tscheck_mikrotik_routers.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /mikrotik/routers/{id}/test -> 200 simulator success; POST /mikrotik/routers/{id}/sync -> 200 with counts."
+    },
+    {
+      "criterion": "Network modules: MikroTik Routers TEST CONNECTION + SYNC, Monitoring PPPoE, GenieACS device list and actions.",
+      "name": "test_tscheck_mikrotik_actions.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PPPoE enable/disable/disconnect actions against simulator -> 200 ActionResult SUCCESS, logged in action log."
+    },
+    {
+      "criterion": "Network modules: MikroTik Routers TEST CONNECTION + SYNC, Monitoring PPPoE, GenieACS device list and actions.",
+      "name": "test_tscheck_pppoe_monitoring.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /mikrotik/pppoe -> 200 list of session objects with router_name/username/status."
+    },
+    {
+      "criterion": "Tickets and PSB create flow, plus Peta Jaringan fault analysis.",
+      "name": "tickets-psb-map-flow",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created ticket (TKT-GMP-000007) via dialog -> toast 'TKT-GMP-000007 dibuat - WhatsApp ke Andi Teknisi terkirim', row visible in list. Created PSB (tscheck-psb-...) via dialog -> row visible. Peta Jaringan page renders Leaflet map with Rumah Pelanggan/ODP/ODC/Teknisi/PSB/Tiket legend counts and 'Dugaan Gangguan Kabel' side panel with 'Analisa Ulang' button, no blank render."
+    },
+    {
+      "criterion": "Tickets and PSB create flow, plus Peta Jaringan fault analysis.",
+      "name": "test_tscheck_tickets_psb_technician.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /tickets -> 200 TKT-GMP-xxxx; POST /psb -> 200 PSB-GMP-xxxx; technician assignment endpoints verified."
+    },
+    {
+      "criterion": "Public ingress smoke (non-matrix, infra sanity).",
+      "name": "login-rbac-dashboard-preview",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Login via https://github-import-deploy-1.preview.emergentagent.com reached Dashboard with Total Pelanggan stat visible."
+    },
+    {
+      "criterion": "Reports/Audit/Settings coverage (supporting backend artifact already present in repo).",
+      "name": "test_tscheck_reports_audit_settings.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /reports, /audit-log, /settings all 200 for super_admin; write-restricted for non-admin roles."
+    }
+  ]
+}
