@@ -11,6 +11,18 @@ router = APIRouter()
 SORTS = {"newest": [("created_at", -1)], "name": [("name", 1)], "code": [("customer_code", 1)], "due": [("due_day", 1)]}
 
 
+async def _check_odp_capacity(odp_id: str, status: str, exclude_id: str = "") -> None:
+    """Reject assignment when the target ODP has no free port left (capacity 0 = unlimited)."""
+    if not odp_id or status == "stopped":
+        return
+    odp = await db.map_assets.find_one({"id": odp_id, "type": "odp"}, {"_id": 0})
+    if not odp or not odp.get("capacity"):
+        return
+    used = await db.customers.count_documents({"odp_id": odp_id, "status": {"$ne": "stopped"}, "id": {"$ne": exclude_id}})
+    if used >= odp["capacity"]:
+        raise HTTPException(409, f"ODP {odp['name']} penuh — kapasitas {odp['capacity']} port, {used} sudah terpakai. Pindahkan pelanggan lain atau tambah ODP.")
+
+
 def to_out(c: dict) -> dict:
     c["has_pppoe_password"] = bool(c.pop("pppoe_password_enc", ""))
     return c
@@ -104,6 +116,7 @@ async def create_customer(body: CustomerIn, actor: dict = Depends(require("custo
     if body.pppoe_username and await db.customers.find_one({"pppoe_username": body.pppoe_username, "router_id": body.router_id}):
         raise HTTPException(409, "Username PPPoE sudah dipakai di router ini")
     data = await _denorm(body)
+    await _check_odp_capacity(data.get("odp_id", ""), body.status)
     pkg = await db.packages.find_one({"id": body.package_id})
     data.update(id=uid(), customer_code=await next_code("CUS"), created_at=now_iso(), connection_status="unknown",
                 integration_status="NOT_LINKED" if not body.router_id else "PENDING", pppoe_profile=pkg.get("mikrotik_profile", ""))
@@ -123,6 +136,8 @@ async def update_customer(id: str, body: CustomerIn, actor: dict = Depends(requi
     if not old:
         raise HTTPException(404, "Pelanggan tidak ditemukan")
     data = await _denorm(body)
+    if data.get("odp_id") and (data["odp_id"] != old.get("odp_id") or (old.get("status") == "stopped" and body.status != "stopped")):
+        await _check_odp_capacity(data["odp_id"], body.status, exclude_id=id)
     if body.status == "stopped" and old["status"] != "stopped":
         data["stopped_at"] = now_iso()
     await db.customers.update_one({"id": id}, {"$set": data})

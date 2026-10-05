@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, Tooltip as LTooltip, useMap, useMapEvents } from "react-leaflet";
-import { AlertTriangle, Check, Crosshair, Pencil, Plus, RefreshCw, Route, Scissors, Undo2, Wrench, X } from "lucide-react";
+import { AlertTriangle, Check, Crosshair, Magnet, Pencil, Plus, RefreshCw, Route, Scissors, Undo2, Wrench, X } from "lucide-react";
 import { AssetDialog, CableDialog } from "@/components/TopologyDialogs";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,14 @@ function MapClicks({ onClick }: { onClick: (lat: number, lng: number) => void })
 
 const nearestAsset = (assets: MapAsset[], pt: number[]) =>
   assets.reduce<MapAsset | null>((best, a) => (!best || (a.latitude - pt[0]) ** 2 + (a.longitude - pt[1]) ** 2 < (best.latitude - pt[0]) ** 2 + (best.longitude - pt[1]) ** 2 ? a : best), null);
+
+const RAD = Math.PI / 180;
+const SNAP_M = 35; // snap a drawn cable point to a pole within this radius (metres)
+function metersBetween(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const la1 = aLat * RAD, la2 = bLat * RAD, dLa = (bLat - aLat) * RAD, dLo = (bLng - aLng) * RAD;
+  const h = Math.sin(dLa / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLo / 2) ** 2;
+  return 6_371_000 * 2 * Math.asin(Math.sqrt(h));
+}
 
 function FaultCard({ f, onFocus }: { f: Fault; onFocus: () => void }) {
   const qc = useQueryClient();
@@ -83,16 +91,30 @@ export default function NetworkMap() {
   const manage = can(me, "mikrotik.routers");
   const [mode, setMode] = useState<EditMode>("view");
   const [draft, setDraft] = useState<number[][]>([]);
+  const [snap, setSnap] = useState(true);
+  const [snapNames, setSnapNames] = useState<(string | null)[]>([]);
   const [assetDlg, setAssetDlg] = useState<{ initial: MapAssetIn; editing: MapAsset | null } | null>(null);
   const [cableDlg, setCableDlg] = useState<{ initial: CableIn; editing: Cable | null } | null>(null);
   const { data: assets = [] } = useQuery({ queryKey: ["map-assets"], queryFn: () => apiGet<MapAsset[]>("/map/assets") });
   const { data: routes = [] } = useQuery({ queryKey: ["map-cables"], queryFn: () => apiGet<Cable[]>("/map/cables") });
+  const poles = useMemo(() => assets.filter((a) => a.type === "pole"), [assets]);
+  const clearDraft = () => { setDraft([]); setSnapNames([]); };
+  const snapTo = (lat: number, lng: number): { lat: number; lng: number; pole: string | null } => {
+    if (!snap || !poles.length) return { lat, lng, pole: null };
+    let best: MapAsset | null = null, bestD = Infinity;
+    for (const p of poles) { const d = metersBetween(lat, lng, p.latitude, p.longitude); if (d < bestD) { bestD = d; best = p; } }
+    return best && bestD <= SNAP_M ? { lat: best.latitude, lng: best.longitude, pole: best.name } : { lat, lng, pole: null };
+  };
   const assetById = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets]);
   const covered = useMemo(() => new Set(routes.flatMap((r) => [`${r.from_id}|${r.to_id}`, `${r.to_id}|${r.from_id}`])), [routes]);
   const editing = mode !== "view";
   const onMapClick = (lat: number, lng: number) => {
-    if (mode === "draw") setDraft((d) => [...d, [lat, lng]]);
-    else if (mode.startsWith("add-")) {
+    if (mode === "draw") {
+      const s = snapTo(lat, lng);
+      setDraft((d) => [...d, [s.lat, s.lng]]);
+      setSnapNames((n) => [...n, s.pole]);
+      if (s.pole) toast.info(`Titik menempel ke ${s.pole}`);
+    } else if (mode.startsWith("add-")) {
       const type = mode.slice(4) as AssetType;
       setAssetDlg({ initial: { type, name: "", latitude: lat, longitude: lng, capacity: 0, parent_id: type === "odp" ? nearestAsset(assets.filter((a) => a.type === "odc"), [lat, lng])?.id ?? "" : "", notes: "" }, editing: null });
       setMode("edit");
@@ -103,7 +125,7 @@ export default function NetworkMap() {
     const to = nearestAsset(assets, draft[draft.length - 1]);
     const kind = to?.type === "odc" ? "feeder" : to?.type === "odp" ? "distribution" : "drop";
     setCableDlg({ initial: { name: "", kind, from_id: from?.id ?? "", to_id: to?.id ?? "", path: draft, core_count: kind === "feeder" ? 48 : kind === "distribution" ? 12 : 1, notes: "" }, editing: null });
-    setDraft([]);
+    clearDraft();
     setMode("edit");
   };
   const editAsset = (id: string) => { const a = assetById.get(id); if (a) setAssetDlg({ initial: { type: a.type, name: a.name, latitude: a.latitude, longitude: a.longitude, capacity: a.capacity, parent_id: a.parent_id, notes: a.notes }, editing: a }); };
@@ -156,19 +178,20 @@ export default function NetworkMap() {
       </div>
       {manage && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2" data-testid="map-edit-toolbar">
-          <Button size="sm" variant={editing ? "default" : "outline"} onClick={() => { setMode(editing ? "view" : "edit"); setDraft([]); }} data-testid="map-edit-toggle"><Pencil className="h-3.5 w-3.5" />{editing ? "Selesai Edit" : "Edit Topologi"}</Button>
+          <Button size="sm" variant={editing ? "default" : "outline"} onClick={() => { setMode(editing ? "view" : "edit"); clearDraft(); }} data-testid="map-edit-toggle"><Pencil className="h-3.5 w-3.5" />{editing ? "Selesai Edit" : "Edit Topologi"}</Button>
           {editing && <>
             {(["odc", "odp", "pole"] as AssetType[]).map((t) => (
               <Button key={t} size="sm" variant={mode === `add-${t}` ? "secondary" : "outline"} onClick={() => setMode(`add-${t}`)} data-testid={`map-add-${t}`}><Plus className="h-3.5 w-3.5" />{t === "pole" ? "Tiang" : t.toUpperCase()}</Button>
             ))}
-            <Button size="sm" variant={mode === "draw" ? "secondary" : "outline"} onClick={() => { setMode("draw"); setDraft([]); }} data-testid="map-draw-cable"><Route className="h-3.5 w-3.5" />Gambar Kabel</Button>
+            <Button size="sm" variant={mode === "draw" ? "secondary" : "outline"} onClick={() => { setMode("draw"); clearDraft(); }} data-testid="map-draw-cable"><Route className="h-3.5 w-3.5" />Gambar Kabel</Button>
             {mode === "draw" && <>
-              <Button size="sm" variant="ghost" disabled={!draft.length} onClick={() => setDraft((d) => d.slice(0, -1))} data-testid="map-draw-undo"><Undo2 className="h-3.5 w-3.5" />Undo</Button>
+              <Button size="sm" variant={snap ? "secondary" : "outline"} onClick={() => setSnap((s) => !s)} data-testid="map-draw-snap" title={`Tempelkan titik ke tiang terdekat (≤ ${SNAP_M} m)`}><Magnet className="h-3.5 w-3.5" />Snap Tiang: {snap ? "ON" : "OFF"}</Button>
+              <Button size="sm" variant="ghost" disabled={!draft.length} onClick={() => { setDraft((d) => d.slice(0, -1)); setSnapNames((n) => n.slice(0, -1)); }} data-testid="map-draw-undo"><Undo2 className="h-3.5 w-3.5" />Undo</Button>
               <Button size="sm" disabled={draft.length < 2} onClick={finishDraw} data-testid="map-draw-finish"><Check className="h-3.5 w-3.5" />Selesai ({draft.length} titik)</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setDraft([]); setMode("edit"); }} data-testid="map-draw-cancel"><X className="h-3.5 w-3.5" />Batal</Button>
+              <Button size="sm" variant="ghost" onClick={() => { clearDraft(); setMode("edit"); }} data-testid="map-draw-cancel"><X className="h-3.5 w-3.5" />Batal</Button>
             </>}
             <span className="text-xs text-muted-foreground" data-testid="map-edit-hint">
-              {mode === "draw" ? "Klik peta untuk menambah titik jalur (ikuti tiang). Titik awal/akhir otomatis dicocokkan ke aset terdekat." : mode.startsWith("add-") ? "Klik lokasi di peta untuk menempatkan aset." : "Klik marker → Edit, atau klik jalur kabel untuk mengubah/hapus."}
+              {mode === "draw" ? `Klik peta untuk menambah titik jalur. ${snap ? "Snap aktif: titik menempel otomatis ke tiang ≤ " + SNAP_M + " m." : "Snap mati: titik mengikuti klik persis."} Titik awal/akhir dicocokkan ke aset terdekat.` : mode.startsWith("add-") ? "Klik lokasi di peta untuk menempatkan aset." : "Klik marker → Edit, atau klik jalur kabel untuk mengubah/hapus."}
             </span>
           </>}
         </div>
@@ -190,7 +213,7 @@ export default function NetworkMap() {
                 );
               })}
               {draft.length > 0 && <Polyline positions={draft as [number, number][]} pathOptions={{ color: "#38BDF8", weight: 3, dashArray: "6 4" }} />}
-              {draft.map((d, i) => <CircleMarker key={`d-${i}`} center={d as [number, number]} radius={4} pathOptions={{ color: "#38BDF8", fillColor: "#0B0F17", fillOpacity: 1 }} />)}
+              {draft.map((d, i) => <CircleMarker key={`d-${i}`} center={d as [number, number]} radius={snapNames[i] ? 5 : 4} pathOptions={{ color: snapNames[i] ? "#F59E0B" : "#38BDF8", fillColor: "#0B0F17", fillOpacity: 1, weight: 2 }}>{snapNames[i] && <LTooltip direction="top" className="!text-[10px]">{snapNames[i]}</LTooltip>}</CircleMarker>)}
               <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               {!hidden.has("cable") && cables.map((p) => {
                 const parent = byId.get(p.parent_id)!;

@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin } from "lucide-react";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "@/lib/recharts";
 import { Input } from "@/components/ui/input";
-import { EmptyRow, NSelect, PageHeader, Pager, Panel, SearchInput, StatusBadge } from "@/components/common";
+import { EmptyRow, NSelect, PageHeader, Pager, Panel, SearchInput, StatCard, StatusBadge } from "@/components/common";
 import { FilterBar, Tbl } from "@/components/kit";
 import { apiGet } from "@/lib/api";
 import { exportCsv, fmtDate, mapsUrl } from "@/lib/format";
-import type { FaultHistory as FH, FaultHotspot, Paged } from "@/lib/types";
+import type { FaultHistory as FH, FaultHotspot, FaultTrend, Paged } from "@/lib/types";
 
 const LEVEL: Record<string, string> = { odc: "Feeder", odp: "Distribusi", drop: "Drop" };
 const dur = (m: number) => (m >= 1440 ? `${Math.floor(m / 1440)}h ${Math.floor((m % 1440) / 60)}j` : m >= 60 ? `${Math.floor(m / 60)}j ${m % 60}m` : `${m}m`);
+const tip = { contentStyle: { background: "#111827", border: "1px solid #1F2937", borderRadius: 10, fontSize: 12 }, labelStyle: { color: "#94A3B8" } };
+const axis = { stroke: "#64748B", fontSize: 11, tickLine: false, axisLine: false };
+const mmdd = (d: string) => d.slice(5);
 
 export default function FaultHistory() {
   const [days, setDays] = useState(90);
@@ -18,6 +22,7 @@ export default function FaultHistory() {
   const [level, setLevel] = useState("");
   const [page, setPage] = useState(1);
   const { data: hot = [] } = useQuery({ queryKey: ["fault-hotspots", days], queryFn: () => apiGet<FaultHotspot[]>(`/network/fault-history/hotspots?days=${days}`) });
+  const { data: trend } = useQuery({ queryKey: ["fault-trend", days], queryFn: () => apiGet<FaultTrend>(`/network/fault-history/trend?days=${days}`), refetchInterval: 60_000 });
   const params = new URLSearchParams({ q, status, level, page: String(page), limit: "30" });
   const { data, isLoading } = useQuery({ queryKey: ["fault-history", params.toString()], queryFn: () => apiGet<Paged<FH>>(`/network/fault-history?${params}`), refetchInterval: 60_000 });
   const rows = data?.items ?? [];
@@ -26,6 +31,31 @@ export default function FaultHistory() {
     <div>
       <PageHeader eyebrow="Lapangan" title="Riwayat Gangguan Kabel" subtitle="Dicatat otomatis tiap menit dari analisa GenieACS + topologi: kapan segmen putus, berapa lama, dan berapa pelanggan terdampak."
         actions={<Button2 onClick={() => exportCsv("riwayat-gangguan.csv", rows as unknown as Record<string, unknown>[], ["started_at", "resolved_at", "level", "segment", "title", "affected_max", "duration_min", "status"])} />} />
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="fault-trend-stats">
+        <StatCard testid="fault-stat-total" label={`Gangguan ${days} hari`} value={trend?.summary.total ?? 0} tone="blue" />
+        <StatCard testid="fault-stat-open" label="Masih Putus" value={trend?.summary.open ?? 0} tone="red" />
+        <StatCard testid="fault-stat-mttr" label="Rata-rata Durasi (MTTR)" value={dur(trend?.summary.mttr_min ?? 0)} tone="amber" />
+        <StatCard testid="fault-stat-affected" label="Total Terdampak" value={trend?.summary.affected_total ?? 0} tone="violet" />
+      </div>
+      <Panel title="Tren Gangguan Harian" className="mb-4" testid="fault-trend-panel"
+        actions={trend ? <span className="text-xs text-muted-foreground" data-testid="fault-trend-breakdown">{trend.summary.resolved} pulih · {trend.summary.by_level.map((l) => `${LEVEL[l.level]} ${l.count}`).join(" · ")}</span> : undefined}>
+        <div className="h-56" data-testid="fault-trend-chart">
+          {trend && trend.summary.total === 0 ? (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground" data-testid="fault-trend-empty">Belum ada gangguan tercatat pada periode ini.</div>
+          ) : (
+            <ResponsiveContainer>
+              <AreaChart data={trend?.points ?? []}>
+                <defs><linearGradient id="flt" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#F59E0B" stopOpacity={0.35} /><stop offset="100%" stopColor="#F59E0B" stopOpacity={0} /></linearGradient></defs>
+                <CartesianGrid stroke="#1F2937" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={mmdd} {...axis} /><YAxis allowDecimals={false} {...axis} width={28} />
+                <Tooltip {...tip} labelFormatter={(d) => fmtDate(String(d))} />
+                <Area type="monotone" dataKey="faults" name="Gangguan" stroke="#F59E0B" strokeWidth={2} fill="url(#flt)" />
+                <Area type="monotone" dataKey="down" name="Putus total" stroke="#EF4444" strokeWidth={2} fillOpacity={0} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </Panel>
       <Panel title="Titik Paling Sering Bermasalah" className="mb-4" testid="fault-hotspots-panel"
         actions={<div className="flex items-center gap-2 text-xs text-muted-foreground">Periode <Input type="number" min={1} max={365} value={days} onChange={(e) => setDays(Number(e.target.value) || 90)} className="h-7 w-16" data-testid="hotspot-days-input" /> hari</div>}>
         {hot.length === 0 ? <div className="text-sm text-muted-foreground">Belum ada riwayat gangguan.</div> : (

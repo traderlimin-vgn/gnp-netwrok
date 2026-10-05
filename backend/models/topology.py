@@ -75,3 +75,30 @@ class FaultHotspot(BaseModel):
     open: bool
     latitude: float
     longitude: float
+
+
+class FaultTrendPoint(BaseModel):
+    date: str
+    faults: int = 0
+    down: int = 0
+    affected: int = 0
+
+
+class LevelCount(BaseModel):
+    level: str
+    count: int
+
+
+class FaultTrendSummary(BaseModel):
+    total: int = 0
+    open: int = 0
+    resolved: int = 0
+    mttr_min: int = 0
+    affected_total: int = 0
+    by_level: list[LevelCount] = []
+
+
+class FaultTrend(BaseModel):
+    days: int
+    points: list[FaultTrendPoint]
+    summary: FaultTrendSummary

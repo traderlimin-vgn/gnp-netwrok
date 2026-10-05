@@ -174,3 +174,6 @@ export interface FaultHistory {
   started_at: string; resolved_at: string | null; duration_min: number;
 }
 export interface FaultHotspot { segment: string; level: "odc" | "odp" | "drop"; count: number; total_duration_min: number; affected_max: number; last_at: string; open: boolean; latitude: number; longitude: number }
+export interface FaultTrendPoint { date: string; faults: number; down: number; affected: number }
+export interface FaultTrendSummary { total: number; open: number; resolved: number; mttr_min: number; affected_total: number; by_level: { level: string; count: number }[] }
+export interface FaultTrend { days: number; points: FaultTrendPoint[]; summary: FaultTrendSummary }

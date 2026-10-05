@@ -8,7 +8,7 @@ from lib.core import audit, now_iso, paginate, uid
 from lib.db import db
 from lib.security import require
 from models.schemas import Paged
-from models.topology import Cable, CableIn, FaultHistory, FaultHotspot, MapAsset, MapAssetIn
+from models.topology import Cable, CableIn, FaultHistory, FaultHotspot, FaultTrend, MapAsset, MapAssetIn
 
 router = APIRouter()
 MANAGE = "mikrotik.routers"  # super_admin + admin
@@ -56,6 +56,15 @@ async def update_asset(id: str, body: MapAssetIn, actor: dict = Depends(require(
     if not old:
         raise HTTPException(404, "Aset tidak ditemukan")
     await _validate_parent(body, id)
+    if body.capacity:
+        if body.type == "odp":
+            used_now = await db.customers.count_documents({"odp_id": id, "status": {"$ne": "stopped"}})
+            if body.capacity < used_now:
+                raise HTTPException(422, f"Kapasitas {body.capacity} port di bawah {used_now} pelanggan yang sudah terpasang di ODP ini")
+        elif body.type == "odc":
+            kids = await db.map_assets.count_documents({"parent_id": id, "type": "odp"})
+            if body.capacity < kids:
+                raise HTTPException(422, f"Kapasitas {body.capacity} di bawah {kids} ODP yang sudah terhubung ke ODC ini")
     await db.map_assets.update_one({"id": id}, {"$set": body.model_dump()})
     if body.type == "odp" and body.name != old["name"]:
         await db.customers.update_many({"odp_id": id}, {"$set": {"odp_name": body.name}})
@@ -143,3 +152,27 @@ async def hotspots(days: int = 90, _: dict = Depends(require("map.view"))):
                     "open": {"$max": {"$cond": [{"$eq": ["$status", "open"]}, 1, 0]}}, "latitude": {"$last": "$latitude"}, "longitude": {"$last": "$longitude"}}},
         {"$sort": {"count": -1, "total_duration_min": -1}}, {"$limit": 50}]).to_list(50)
     return [{**r, "open": bool(r["open"])} for r in rows]
+
+
+@router.get("/network/fault-history/trend", response_model=FaultTrend)
+async def fault_trend(days: int = 30, _: dict = Depends(require("map.view"))):
+    from datetime import datetime, timedelta, timezone
+    days = max(1, min(days, 365))
+    start = (datetime.now(timezone.utc) - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = await db.fault_history.find({"started_at": {"$gte": start.isoformat()}}, {"_id": 0}).to_list(20000)
+    buckets: dict[str, dict] = {}
+    for r in rows:
+        b = buckets.setdefault(r["started_at"][:10], {"faults": 0, "down": 0, "affected": 0})
+        b["faults"] += 1
+        b["down"] += 1 if r["severity"] == "down" else 0
+        b["affected"] += r.get("affected_max", 0)
+    points = [{"date": (d := (start + timedelta(days=i)).strftime("%Y-%m-%d")), **buckets.get(d, {"faults": 0, "down": 0, "affected": 0})} for i in range(days)]
+    resolved = [r for r in rows if r["status"] == "resolved"]
+    by_level: dict[str, int] = {}
+    for r in rows:
+        by_level[r["level"]] = by_level.get(r["level"], 0) + 1
+    summary = {"total": len(rows), "open": sum(1 for r in rows if r["status"] == "open"), "resolved": len(resolved),
+               "mttr_min": int(sum(r["duration_min"] for r in resolved) / len(resolved)) if resolved else 0,
+               "affected_total": sum(r.get("affected_max", 0) for r in rows),
+               "by_level": [{"level": k, "count": v} for k, v in sorted(by_level.items())]}
+    return {"days": days, "points": points, "summary": summary}

@@ -34,17 +34,33 @@ export function AssetDialog({ initial, editing, assets, onClose }: { initial: Ma
     onError: (e) => toast.error(errMsg(e)),
   });
   const parents = f.type === "odp" ? assets.filter((a) => a.type === "odc") : [];
+  const usedNow = editing ? (editing.type === "odp" ? editing.used : editing.children) : 0;
+  const capBelow = !!editing && f.type !== "pole" && f.capacity > 0 && f.capacity < usedNow;
   return (
     <Modal open onClose={onClose} title={`${editing ? "Edit" : "Tambah"} ${ASSET_LABEL[f.type]}`} testid="asset-dialog"
       footer={<>
         {editing && <ConfirmButton size="sm" variant="destructive" label="Hapus" icon={<Trash2 className="h-3.5 w-3.5" />} title="Hapus aset" message={`Hapus ${editing.name}? Jalur kabel yang terhubung ikut terhapus.`} onConfirm={() => del.mutate()} testid="asset-delete" />}
-        <Button onClick={() => save.mutate()} disabled={save.isPending || f.name.length < 2} data-testid="asset-submit">Simpan</Button>
+        <Button onClick={() => save.mutate()} disabled={save.isPending || f.name.length < 2 || capBelow} data-testid="asset-submit">Simpan</Button>
       </>}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Jenis"><NSelect value={f.type} onChange={(v) => setF({ ...f, type: v as AssetType, parent_id: "" })} options={Object.entries(ASSET_LABEL).map(([value, label]) => ({ value, label }))} testid="asset-type-select" /></Field>
         <Field label="Nama"><Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder={f.type === "pole" ? "TIANG-001" : `${ASSET_LABEL[f.type]}-GMP-09`} className="font-mono" data-testid="asset-name-input" /></Field>
         {f.type !== "pole" && <Field label="Kapasitas port" hint={editing ? `Terpakai ${editing.used} ${f.type === "odp" ? "pelanggan" : "ODP"}` : undefined}><Input type="number" value={f.capacity} onChange={(e) => set("capacity", Number(e.target.value))} data-testid="asset-capacity-input" /></Field>}
         {f.type === "odp" && <Field label="Induk ODC"><NSelect value={f.parent_id} onChange={(v) => set("parent_id", v)} options={parents.map((a) => ({ value: a.id, label: a.name }))} placeholder="— Pilih ODC —" testid="asset-parent-select" /></Field>}
+        {editing && f.type !== "pole" && (() => {
+          const cap = f.capacity || 0;
+          const pct = cap ? Math.min(100, Math.round((usedNow / cap) * 100)) : 0;
+          const full = cap > 0 && usedNow >= cap;
+          const unit = f.type === "odp" ? "pelanggan" : "ODP";
+          return (
+            <div className="sm:col-span-2" data-testid="asset-capacity-usage">
+              <div className="mb-1 flex items-center justify-between text-xs"><span className="text-muted-foreground">Utilisasi port</span><span className="font-mono">{usedNow}/{cap || "∞"} {unit}{cap ? ` · ${pct}%` : ""}</span></div>
+              <div className="h-2 rounded-full bg-slate-800"><div className={`h-2 rounded-full transition-[width] duration-500 ${full ? "bg-red-500" : pct >= 80 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${cap ? pct : 0}%` }} /></div>
+              {capBelow && <div className="mt-1.5 text-xs text-red-400" data-testid="asset-capacity-warning">Kapasitas tidak boleh di bawah {usedNow} {unit} yang sudah terhubung.</div>}
+              {full && !capBelow && <div className="mt-1.5 text-xs text-amber-400" data-testid="asset-capacity-full">Port penuh — pelanggan baru tidak bisa ditambahkan ke {f.type.toUpperCase()} ini.</div>}
+            </div>
+          );
+        })()}
         <Field label="Latitude"><Input type="number" step="any" value={f.latitude} onChange={(e) => set("latitude", Number(e.target.value))} data-testid="asset-lat-input" /></Field>
         <Field label="Longitude"><Input type="number" step="any" value={f.longitude} onChange={(e) => set("longitude", Number(e.target.value))} data-testid="asset-lng-input" /></Field>
         <Field label="Catatan" className="sm:col-span-2"><Textarea rows={2} value={f.notes} onChange={(e) => set("notes", e.target.value)} data-testid="asset-notes-input" /></Field>

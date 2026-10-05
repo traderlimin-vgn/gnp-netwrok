@@ -1,0 +1,126 @@
+{
+  "iteration": 2,
+  "mode": "retest",
+  "summary": "Retest of 3 new topology enhancements (capacity guard, cable-snap toggle, fault trend) + full regression of prior 8 criteria. Backend: 22/22 pytest tests pass (4 new + 18 existing). Browser: 12/12 named checks pass (3 new + 9 existing regression incl. public-preview smoke). One check (login-rbac-dashboard) failed twice due to the app's own login rate-limiter (10 attempts/60s) being tripped by repeated reruns within this session, then passed clean after a 65s cooldown -> classified flaky, not a bug. No application bugs found.",
+  "passed": 14,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    "login-rbac-dashboard browser check can trip the backend's login rate-limiter (10/60s per IP) when rerun back-to-back during testing sessions; not a defect, but note for future test scheduling (space reruns >60s apart)."
+  ],
+  "retest_needed": true,
+  "checks": [
+    {
+      "criterion": "Capacity guard — reject assigning a customer to a FULL ODP (backend 409).",
+      "name": "test_tscheck_capacity_guard.py::test_odp_full_rejects_second_customer",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Created ODP capacity=1 -> POST /customers 1st assignment 200; 2nd assignment to same ODP -> 409 'ODP ... penuh ...'; assignment to seeded ODP-GMP-01 (2/16 used, free ports) -> 200."
+    },
+    {
+      "criterion": "Capacity guard — reject lowering an asset's capacity below its current usage (backend 422).",
+      "name": "test_tscheck_capacity_guard.py::test_lower_capacity_below_used_rejected",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "ODP with 2 active customers -> PUT /map/assets/{id} capacity=1 -> 422 'Kapasitas ... di bawah 2 pelanggan ...'; PUT capacity=2 (>= used) -> 200."
+    },
+    {
+      "criterion": "Capacity usage indicator in the Asset dialog (frontend).",
+      "name": "map-asset-capacity-indicator",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Edit Topologi -> isolated ODP layer -> clicked ODP marker -> popup 'Edit ...' -> asset-dialog opened with asset-capacity-usage showing 'used/capacity' format; lowering capacity input below used surfaced asset-capacity-warning and disabled asset-submit. Closed via Escape without saving (no seeded data mutated)."
+    },
+    {
+      "criterion": "Cable-draw snapping to nearest pole (frontend).",
+      "name": "map-cable-draw-snap-toggle",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Edit Topologi -> Gambar Kabel: map-draw-snap defaulted to 'Snap Tiang: ON' with hint containing 'Snap aktif'; toggled to OFF, hint updated to 'Snap mati'; two map clicks added draft points, map-draw-finish enabled, cable-dialog opened. Canceled via Escape without saving. No console errors beyond a benign transient 401 pre-auth."
+    },
+    {
+      "criterion": "Fault trend endpoint returns well-formed data (backend).",
+      "name": "test_tscheck_fault_trend.py::test_fault_trend_shape + test_fault_trend_reflects_simulated_fault",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /network/fault-history/trend?days=30 -> 200 {days:30, points: 30 items each with date/faults/down/affected, summary: total/open/resolved/mttr_min/affected_total/by_level}. Simulated a cut via POST /network/faults/simulate on an ODP with >=2 customers, GET /network/faults to force analyze()+record_history(), re-queried trend -> total did not decrease (>=before) with points structurally valid; restored ODP afterwards."
+    },
+    {
+      "criterion": "Riwayat Gangguan page shows trend analytics (frontend).",
+      "name": "fault-history-trend-panel",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "/network/fault-history renders fault-stat-total/open/mttr/affected StatCards and fault-trend-panel; fault-trend-chart renders the documented empty-state (fault-trend-empty: 'Belum ada gangguan tercatat pada periode ini.') consistent with current empty fault_history collection per spec_deviations. No console errors."
+    },
+    {
+      "criterion": "Regression — existing topology CRUD still works (backend).",
+      "name": "test_tscheck_capacity_guard.py (covers create/edit/delete ODP via /map/assets within guard tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /map/assets (new ODP) -> 200; PUT /map/assets/{id} (capacity edits) -> 200/422 as expected; DELETE /map/assets/{id} succeeded only after customers removed (none left with children)."
+    },
+    {
+      "criterion": "Login + RBAC regression.",
+      "name": "login-rbac-dashboard",
+      "lane": "browser",
+      "status": "flaky",
+      "evidence": "First two reruns in this session hit HTTP 429 from the backend's own rate_limit('login:{ip}', 10/60s) due to rapid repeated login attempts across checks; passed cleanly after a 65s cooldown with all 3 assertions (superadmin dashboard, wrong-password message, cs reduced nav) satisfied."
+    },
+    {
+      "criterion": "Regression — Dashboard renders stats/charts.",
+      "name": "dashboard-stats-charts",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Total Pelanggan + chart headings visible post-login."
+    },
+    {
+      "criterion": "Regression — Pelanggan list/search/detail.",
+      "name": "customers-list-search-detail",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Search filters to GMP-000031 row; detail sheet opens with MikroTik section."
+    },
+    {
+      "criterion": "Regression — create new Pelanggan.",
+      "name": "customers-create-new-pelanggan",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "POST /customers -> 200 new customer GMP-000066 tscheck-newcust-..., dialog closed."
+    },
+    {
+      "criterion": "Regression — Tagihan generate + pay.",
+      "name": "invoices-generate-and-pay",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Paid INV-GMP-202610-000051 via dialog, row becomes LUNAS."
+    },
+    {
+      "criterion": "Regression — Pembayaran confirm pending.",
+      "name": "payments-confirm-pending",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created pending payment, confirmed via UI -> TERKONFIRMASI."
+    },
+    {
+      "criterion": "Regression — MikroTik routers/PPPoE/GenieACS.",
+      "name": "network-routers-pppoe-acs",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Test Connection + Sync dialogs, PPPoE monitoring rows, GenieACS wifi-change dialog all rendered as before."
+    },
+    {
+      "criterion": "Regression — Tickets/PSB/Peta Jaringan base flow.",
+      "name": "tickets-psb-map-flow",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created ticket + PSB rows, Peta Jaringan renders map and fault panel without blank state."
+    },
+    {
+      "criterion": "Public ingress smoke (non-matrix, infra sanity).",
+      "name": "login-rbac-dashboard-preview",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Login via public preview URL reached Dashboard with Total Pelanggan stat visible."
+    }
+  ]
+}
