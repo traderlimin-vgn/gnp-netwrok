@@ -534,7 +534,7 @@ class Psb(Out):
 # ---------- misc ----------
 class MapPoint(BaseModel):
     id: str
-    type: Literal["customer", "odp", "odc", "technician", "psb", "ticket", "router"]
+    type: Literal["customer", "odp", "odc", "pole", "technician", "psb", "ticket", "router"]
     name: str
     latitude: float
     longitude: float

@@ -37,3 +37,9 @@ Customers have `odp_id/odp_name` (form select; empty = auto nearest ODP by coord
 services/network_faults.py `analyze()`: ONT state per customer (online / weak RX < -27 / offline). ODP down if ≥2 ONT and ≥60% offline; warning if ≥30% offline or ≥2 weak. ODC (feeder) down if ≥2 ODPs and ≥50% of its ODPs down. Single offline ONT on healthy ODP → "drop" fault.
 Endpoints: GET /api/network/faults (FaultReport: faults, odps, odcs, onts), POST /api/network/faults/simulate {odp_id, cut} (simulator mode only, demo LOS).
 Map: ONT colours per house, red animated cable on cut segment, pulsing fault circle, side panel "Dugaan Gangguan Kabel" with Lokasi / Google Maps / Buat Tiket (ticket critical with affected customers).
+
+## Topologi & Riwayat Gangguan
+- map_assets types: odc, odp, pole (tiang). CRUD /api/map/assets (perm mikrotik.routers = super_admin/admin); ODP parent must be ODC; delete blocked (409) if children/customers; `used` = customers on ODP / ODPs on ODC.
+- cable_routes: CRUD /api/map/cables {kind feeder|distribution|drop, from_id, to_id, path [[lat,lng]...], core_count}; length_m computed (haversine). Map draws route path instead of straight line; coloured red when its to_id segment is faulty.
+- Map "Edit Topologi" mode: add ODC/ODP/Tiang by clicking map, Gambar Kabel (click points → Selesai → dialog auto-matches nearest assets), click marker popup "Edit", click cable to edit/delete.
+- fault_history: written by services/network_faults.record_history() on every analyze() (GET /network/faults + scheduler every 60s). GET /api/network/fault-history (paged, status/level/q), GET /api/network/fault-history/hotspots?days=90. Page /network/fault-history "Riwayat Gangguan".

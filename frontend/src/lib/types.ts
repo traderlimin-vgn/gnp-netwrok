@@ -110,7 +110,7 @@ export interface Psb extends PsbIn {
   id: string; psb_no: string; package_name: string; technician_name: string; status: string; photos: string[]; customer_id: string; created_at: string;
 }
 export interface MapPoint {
-  id: string; type: "customer" | "odp" | "odc" | "technician" | "psb" | "ticket" | "router"; name: string;
+  id: string; type: "customer" | "odp" | "odc" | "pole" | "technician" | "psb" | "ticket" | "router"; name: string;
   latitude: number; longitude: number; status: string; info: string; parent_id: string;
 }
 export interface Notification { id: string; type: string; title: string; message: string; read: boolean; created_at: string }
@@ -160,3 +160,17 @@ export interface Fault {
 export interface OdpHealth { odp_id: string; odp_name: string; odc_id: string; odc_name: string; latitude: number; longitude: number; total: number; online: number; offline: number; weak: number; severity: "ok" | "warning" | "down" }
 export interface OdcHealth { odc_id: string; odc_name: string; latitude: number; longitude: number; odps_total: number; odps_down: number; severity: "ok" | "warning" | "down" }
 export interface FaultReport { generated_at: string; faults: Fault[]; odps: OdpHealth[]; odcs: OdcHealth[]; onts: OntState[] }
+
+// Topology + fault history — mirrors backend/models/topology.py
+export type AssetType = "odc" | "odp" | "pole";
+export type CableKind = "feeder" | "distribution" | "drop";
+export interface MapAssetIn { type: AssetType; name: string; latitude: number; longitude: number; capacity: number; parent_id: string; notes: string }
+export interface MapAsset extends MapAssetIn { id: string; used: number; children: number }
+export interface CableIn { name: string; kind: CableKind; from_id: string; to_id: string; path: number[][]; core_count: number; notes: string }
+export interface Cable extends CableIn { id: string; length_m: number; from_name: string; to_name: string }
+export interface FaultHistory {
+  id: string; fault_key: string; level: "odc" | "odp" | "drop"; severity: "down" | "warning"; title: string; segment: string;
+  latitude: number; longitude: number; odp_id: string; odc_id: string; affected_max: number; status: "open" | "resolved";
+  started_at: string; resolved_at: string | null; duration_min: number;
+}
+export interface FaultHotspot { segment: string; level: "odc" | "odp" | "drop"; count: number; total_duration_min: number; affected_max: number; last_at: string; open: boolean; latitude: number; longitude: number }

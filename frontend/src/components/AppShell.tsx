@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, Bell, Boxes, ClipboardList, FileText, Gauge, HardHat, LogOut, Map as MapIcon, Menu, MessageCircle,
-  Network, ReceiptText, Cable, Router as RouterIcon, ScrollText, Settings as SettingsIcon, ShieldCheck, Users, Wallet, Wrench, BarChart3,
+  Network, ReceiptText, Cable, History, Router as RouterIcon, ScrollText, Settings as SettingsIcon, ShieldCheck, Users, Wallet, Wrench, BarChart3,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -37,6 +37,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     { to: "/psb", label: "PSB — Pasang Baru", icon: <ClipboardList />, perm: "psb.view", testid: "nav-psb" },
     { to: "/technician", label: "Dashboard Teknisi", icon: <HardHat />, perm: "technician.view", testid: "nav-technician" },
     { to: "/map", label: "Peta Jaringan", icon: <MapIcon />, perm: "map.view", testid: "nav-map" },
+    { to: "/network/fault-history", label: "Riwayat Gangguan", icon: <History />, perm: "map.view", testid: "nav-fault-history" },
   ] },
   { title: "Laporan & Audit", items: [
     { to: "/reports", label: "Laporan", icon: <BarChart3 />, perm: "reports.view", testid: "nav-reports" },

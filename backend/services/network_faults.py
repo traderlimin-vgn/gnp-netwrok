@@ -2,7 +2,9 @@
 to pinpoint the most likely broken cable segment (feeder, distribution, or drop)."""
 
 from integrations.genieacs.service import GenieAcsService
-from lib.core import now_iso
+from datetime import datetime
+
+from lib.core import now_iso, uid
 from lib.db import db
 
 WEAK_RX = -27.0
@@ -13,6 +15,26 @@ async def nearest_odp(lat: float | None, lng: float | None) -> dict | None:
         return None
     odps = await db.map_assets.find({"type": "odp"}, {"_id": 0}).to_list(5000)
     return min(odps, key=lambda o: (o["latitude"] - lat) ** 2 + (o["longitude"] - lng) ** 2, default=None)
+
+
+async def record_history(faults: list[dict]) -> None:
+    """Open a history row when a segment fault appears, close it (with duration) when it disappears. Idempotent per run."""
+    now = now_iso()
+    open_rows = {h["fault_key"]: h async for h in db.fault_history.find({"status": "open"}, {"_id": 0})}
+    current = {f["id"]: f for f in faults}
+    for key, f in current.items():
+        if key in open_rows:
+            if f["affected_count"] > open_rows[key].get("affected_max", 0):
+                await db.fault_history.update_one({"id": open_rows[key]["id"]}, {"$set": {"affected_max": f["affected_count"]}})
+            continue
+        await db.fault_history.insert_one({"id": uid(), "fault_key": key, "level": f["level"], "severity": f["severity"], "title": f["title"],
+                                           "segment": f["segment"], "latitude": f["latitude"], "longitude": f["longitude"], "odp_id": f["odp_id"],
+                                           "odc_id": f["odc_id"], "affected_max": f["affected_count"], "status": "open", "started_at": now,
+                                           "resolved_at": None, "duration_min": 0})
+    for key, h in open_rows.items():
+        if key not in current:
+            mins = int((datetime.fromisoformat(now) - datetime.fromisoformat(h["started_at"])).total_seconds() // 60)
+            await db.fault_history.update_one({"id": h["id"]}, {"$set": {"status": "resolved", "resolved_at": now, "duration_min": mins}})
 
 
 async def analyze() -> dict:
@@ -87,4 +109,5 @@ async def analyze() -> dict:
     faults.sort(key=lambda f: (f["severity"] != "down", rank[f["level"]], -len(f["affected"])))
     for f in faults:
         f["affected_count"] = len(f["affected"])
+    await record_history(faults)
     return {"generated_at": now_iso(), "faults": faults, "odps": odp_rows, "odcs": odc_rows, "onts": list(ont.values())}

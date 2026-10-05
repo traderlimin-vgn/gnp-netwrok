@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, Tooltip as LTooltip, useMap } from "react-leaflet";
-import { AlertTriangle, Crosshair, RefreshCw, Scissors, Wrench } from "lucide-react";
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, Tooltip as LTooltip, useMap, useMapEvents } from "react-leaflet";
+import { AlertTriangle, Check, Crosshair, Pencil, Plus, RefreshCw, Route, Scissors, Undo2, Wrench, X } from "lucide-react";
+import { AssetDialog, CableDialog } from "@/components/TopologyDialogs";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { NSelect, PageHeader, StatusBadge } from "@/components/common";
 import { apiGet, apiPost, errMsg } from "@/lib/api";
 import { can, fmtDate, mapsUrl, useMe } from "@/lib/format";
-import type { AcsConfig, Fault, FaultReport, MapPoint, Ticket } from "@/lib/types";
+import type { AcsConfig, AssetType, Cable, CableIn, Fault, FaultReport, MapAsset, MapAssetIn, MapPoint, Ticket } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const LAYERS: { type: MapPoint["type"] | "cable"; label: string; color: string; radius: number }[] = [
   { type: "customer", label: "Rumah Pelanggan", color: "#10B981", radius: 5 },
   { type: "odp", label: "ODP", color: "#F59E0B", radius: 7 },
   { type: "odc", label: "ODC", color: "#A855F7", radius: 9 },
+  { type: "pole", label: "Tiang", color: "#94A3B8", radius: 4 },
   { type: "router", label: "Router MikroTik", color: "#38BDF8", radius: 10 },
   { type: "technician", label: "Teknisi", color: "#F472B6", radius: 7 },
   { type: "psb", label: "PSB", color: "#60A5FA", radius: 7 },
@@ -28,6 +30,16 @@ function FlyTo({ target }: { target: [number, number] | null }) {
   useEffect(() => { if (target) map.flyTo(target, 16, { duration: 0.8 }); }, [map, target]);
   return null;
 }
+
+type EditMode = "view" | "edit" | `add-${AssetType}` | "draw";
+
+function MapClicks({ onClick }: { onClick: (lat: number, lng: number) => void }) {
+  useMapEvents({ click: (e) => onClick(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6))) });
+  return null;
+}
+
+const nearestAsset = (assets: MapAsset[], pt: number[]) =>
+  assets.reduce<MapAsset | null>((best, a) => (!best || (a.latitude - pt[0]) ** 2 + (a.longitude - pt[1]) ** 2 < (best.latitude - pt[0]) ** 2 + (best.longitude - pt[1]) ** 2 ? a : best), null);
 
 function FaultCard({ f, onFocus }: { f: Fault; onFocus: () => void }) {
   const qc = useQueryClient();
@@ -68,13 +80,40 @@ export default function NetworkMap() {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [target, setTarget] = useState<[number, number] | null>(null);
   const [simOdp, setSimOdp] = useState("");
+  const manage = can(me, "mikrotik.routers");
+  const [mode, setMode] = useState<EditMode>("view");
+  const [draft, setDraft] = useState<number[][]>([]);
+  const [assetDlg, setAssetDlg] = useState<{ initial: MapAssetIn; editing: MapAsset | null } | null>(null);
+  const [cableDlg, setCableDlg] = useState<{ initial: CableIn; editing: Cable | null } | null>(null);
+  const { data: assets = [] } = useQuery({ queryKey: ["map-assets"], queryFn: () => apiGet<MapAsset[]>("/map/assets") });
+  const { data: routes = [] } = useQuery({ queryKey: ["map-cables"], queryFn: () => apiGet<Cable[]>("/map/cables") });
+  const assetById = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets]);
+  const covered = useMemo(() => new Set(routes.flatMap((r) => [`${r.from_id}|${r.to_id}`, `${r.to_id}|${r.from_id}`])), [routes]);
+  const editing = mode !== "view";
+  const onMapClick = (lat: number, lng: number) => {
+    if (mode === "draw") setDraft((d) => [...d, [lat, lng]]);
+    else if (mode.startsWith("add-")) {
+      const type = mode.slice(4) as AssetType;
+      setAssetDlg({ initial: { type, name: "", latitude: lat, longitude: lng, capacity: 0, parent_id: type === "odp" ? nearestAsset(assets.filter((a) => a.type === "odc"), [lat, lng])?.id ?? "" : "", notes: "" }, editing: null });
+      setMode("edit");
+    }
+  };
+  const finishDraw = () => {
+    const from = nearestAsset(assets, draft[0]);
+    const to = nearestAsset(assets, draft[draft.length - 1]);
+    const kind = to?.type === "odc" ? "feeder" : to?.type === "odp" ? "distribution" : "drop";
+    setCableDlg({ initial: { name: "", kind, from_id: from?.id ?? "", to_id: to?.id ?? "", path: draft, core_count: kind === "feeder" ? 48 : kind === "distribution" ? 12 : 1, notes: "" }, editing: null });
+    setDraft([]);
+    setMode("edit");
+  };
+  const editAsset = (id: string) => { const a = assetById.get(id); if (a) setAssetDlg({ initial: { type: a.type, name: a.name, latitude: a.latitude, longitude: a.longitude, capacity: a.capacity, parent_id: a.parent_id, notes: a.notes }, editing: a }); };
   const toggle = (t: string) => setHidden((h) => { const n = new Set(h); if (n.has(t)) n.delete(t); else n.add(t); return n; });
   const byId = useMemo(() => new Map(data.map((p) => [p.id, p])), [data]);
   const ont = useMemo(() => new Map((report?.onts ?? []).map((o) => [o.customer_id, o])), [report]);
   const odpSev = useMemo(() => new Map((report?.odps ?? []).map((o) => [o.odp_id, o])), [report]);
   const odcSev = useMemo(() => new Map((report?.odcs ?? []).map((o) => [o.odc_id, o])), [report]);
   const center: [number, number] = data.length ? [data.reduce((a, p) => a + p.latitude, 0) / data.length, data.reduce((a, p) => a + p.longitude, 0) / data.length] : [-7.41, 112.6];
-  const cables = data.filter((p) => p.parent_id && byId.has(p.parent_id));
+  const cables = data.filter((p) => p.parent_id && byId.has(p.parent_id) && !covered.has(`${p.id}|${p.parent_id}`));
   const faults = report?.faults ?? [];
   const down = faults.filter((f) => f.severity === "down");
   const sim = useMutation({
@@ -115,11 +154,43 @@ export default function NetworkMap() {
           <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" />LOS/offline</span>
         </span>
       </div>
+      {manage && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2" data-testid="map-edit-toolbar">
+          <Button size="sm" variant={editing ? "default" : "outline"} onClick={() => { setMode(editing ? "view" : "edit"); setDraft([]); }} data-testid="map-edit-toggle"><Pencil className="h-3.5 w-3.5" />{editing ? "Selesai Edit" : "Edit Topologi"}</Button>
+          {editing && <>
+            {(["odc", "odp", "pole"] as AssetType[]).map((t) => (
+              <Button key={t} size="sm" variant={mode === `add-${t}` ? "secondary" : "outline"} onClick={() => setMode(`add-${t}`)} data-testid={`map-add-${t}`}><Plus className="h-3.5 w-3.5" />{t === "pole" ? "Tiang" : t.toUpperCase()}</Button>
+            ))}
+            <Button size="sm" variant={mode === "draw" ? "secondary" : "outline"} onClick={() => { setMode("draw"); setDraft([]); }} data-testid="map-draw-cable"><Route className="h-3.5 w-3.5" />Gambar Kabel</Button>
+            {mode === "draw" && <>
+              <Button size="sm" variant="ghost" disabled={!draft.length} onClick={() => setDraft((d) => d.slice(0, -1))} data-testid="map-draw-undo"><Undo2 className="h-3.5 w-3.5" />Undo</Button>
+              <Button size="sm" disabled={draft.length < 2} onClick={finishDraw} data-testid="map-draw-finish"><Check className="h-3.5 w-3.5" />Selesai ({draft.length} titik)</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setDraft([]); setMode("edit"); }} data-testid="map-draw-cancel"><X className="h-3.5 w-3.5" />Batal</Button>
+            </>}
+            <span className="text-xs text-muted-foreground" data-testid="map-edit-hint">
+              {mode === "draw" ? "Klik peta untuk menambah titik jalur (ikuti tiang). Titik awal/akhir otomatis dicocokkan ke aset terdekat." : mode.startsWith("add-") ? "Klik lokasi di peta untuk menempatkan aset." : "Klik marker → Edit, atau klik jalur kabel untuk mengubah/hapus."}
+            </span>
+          </>}
+        </div>
+      )}
       <div className="grid gap-3 xl:grid-cols-[1fr_340px]">
         <div className="h-[calc(100vh-15rem)] min-h-[440px] overflow-hidden rounded-xl border" data-testid="network-map">
           {data.length > 0 && (
-            <MapContainer center={center} zoom={13} className="h-full w-full" scrollWheelZoom>
+            <MapContainer center={center} zoom={13} className={cn("h-full w-full", (mode === "draw" || mode.startsWith("add-")) && "[&_.leaflet-container]:cursor-crosshair cursor-crosshair")} scrollWheelZoom>
               <FlyTo target={target} />
+              <MapClicks onClick={onMapClick} />
+              {!hidden.has("cable") && routes.map((r) => {
+                const toPt = byId.get(r.to_id);
+                const style = toPt ? cableStyle(toPt) : { color: "#64748B", weight: 2 };
+                return (
+                  <Polyline key={`r-${r.id}`} positions={r.path as [number, number][]} pathOptions={{ ...style, dashArray: style.color === "#EF4444" ? "8 6" : undefined, weight: (style.weight ?? 2) + 1 }}
+                    eventHandlers={{ click: () => { if (editing && manage) setCableDlg({ initial: { name: r.name, kind: r.kind, from_id: r.from_id, to_id: r.to_id, path: r.path, core_count: r.core_count, notes: r.notes }, editing: r }); } }}>
+                    <LTooltip sticky>{r.name} · {r.core_count} core · {Math.round(r.length_m)} m</LTooltip>
+                  </Polyline>
+                );
+              })}
+              {draft.length > 0 && <Polyline positions={draft as [number, number][]} pathOptions={{ color: "#38BDF8", weight: 3, dashArray: "6 4" }} />}
+              {draft.map((d, i) => <CircleMarker key={`d-${i}`} center={d as [number, number]} radius={4} pathOptions={{ color: "#38BDF8", fillColor: "#0B0F17", fillOpacity: 1 }} />)}
               <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               {!hidden.has("cable") && cables.map((p) => {
                 const parent = byId.get(p.parent_id)!;
@@ -148,6 +219,7 @@ export default function NetworkMap() {
                         {sev && "total" in sev && <div>ONT: {sev.online} online · {sev.weak} redaman · <b>{sev.offline} offline</b> / {sev.total}</div>}
                         {sev && "odps_total" in sev && <div>ODP down: {sev.odps_down}/{sev.odps_total}</div>}
                         <a href={mapsUrl(p.latitude, p.longitude)} target="_blank" rel="noreferrer">Buka Google Maps</a>
+                        {editing && manage && assetById.has(p.id) && <button className="ml-2 font-semibold text-sky-600 underline" onClick={() => editAsset(p.id)} data-testid={`map-edit-asset-${p.id}`}>Edit {p.name}</button>}
                       </div>
                     </Popup>
                   </CircleMarker>
@@ -168,6 +240,8 @@ export default function NetworkMap() {
             {report && faults.length === 0 && <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-300" data-testid="fault-none">Semua jalur kabel normal — tidak ada ONT LOS massal.</div>}
             {faults.map((f) => <FaultCard key={f.id} f={f} onFocus={() => setTarget([f.latitude, f.longitude])} />)}
           </div>
+          {assetDlg && <AssetDialog initial={assetDlg.initial} editing={assetDlg.editing} assets={assets} onClose={() => setAssetDlg(null)} />}
+          {cableDlg && <CableDialog initial={cableDlg.initial} editing={cableDlg.editing} assets={assets} onClose={() => setCableDlg(null)} />}
           {acsCfg?.mode === "simulator" && can(me, "mikrotik.control") && (
             <div className="border-t p-3" data-testid="fault-simulator">
               <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Demo: simulasi putus kabel</div>

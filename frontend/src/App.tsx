@@ -21,6 +21,7 @@ import Reports from "@/pages/Reports";
 import Audit from "@/pages/Audit";
 import SettingsPage from "@/pages/Settings";
 import Acs from "@/pages/Acs";
+import FaultHistory from "@/pages/FaultHistory";
 
 function Protected({ perm, children }: { perm: string; children: ReactNode }) {
   const { data: me, isLoading, isError } = useMe();
@@ -55,6 +56,7 @@ const ROUTES: [string, string, ReactNode][] = [
   ["/psb", "psb.view", <PsbPage />],
   ["/technician", "technician.view", <Technician />],
   ["/map", "map.view", <NetworkMap />],
+  ["/network/fault-history", "map.view", <FaultHistory />],
   ["/reports", "reports.view", <Reports />],
   ["/audit", "audit.view", <Audit />],
   ["/settings", "settings.manage", <SettingsPage />],
