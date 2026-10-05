@@ -9,13 +9,14 @@ import { EmptyRow, Field, NSelect, PageHeader, Pager, Panel, SearchInput, Status
 import { FilterBar, Tbl } from "@/components/kit";
 import { apiGet, apiPost, errMsg } from "@/lib/api";
 import { can, fmtDate, useMe } from "@/lib/format";
-import type { Paged, WhatsAppMessage } from "@/lib/types";
+import type { Paged, WaConfig, WhatsAppMessage } from "@/lib/types";
 
 const TEMPLATES = ["invoice", "payment", "isolir", "activation", "ticket_technician", "psb_technician", "manual"];
 
 export default function WhatsApp() {
   const qc = useQueryClient();
   const { data: me } = useMe();
+  const { data: cfg } = useQuery({ queryKey: ["wa-config"], queryFn: () => apiGet<WaConfig>("/whatsapp/config") });
   const [q, setQ] = useState("");
   const [template, setTemplate] = useState("");
   const [page, setPage] = useState(1);
@@ -31,7 +32,11 @@ export default function WhatsApp() {
   const rows = data?.items ?? [];
   return (
     <div>
-      <PageHeader eyebrow="Billing & Kas" title="WhatsApp Gateway" subtitle="Log notifikasi tagihan, pembayaran, isolir, tiket & PSB. Mode saat ini: SIMULATOR (pesan dicatat, tidak dikirim ke WhatsApp asli)." />
+      <PageHeader eyebrow="Billing & Kas" title="WhatsApp Gateway"
+        subtitle={cfg?.provider === "fonnte"
+          ? "Mode: FONNTE — pesan dikirim dari nomor WhatsApp pribadi yang dipasangkan. Atur token & tes di Pengaturan → WhatsApp."
+          : "Mode: SIMULATOR (pesan dicatat, tidak dikirim ke WhatsApp asli). Aktifkan Fonnte di Pengaturan → WhatsApp untuk mengirim dari nomor pribadi."}
+        actions={<StatusBadge value={cfg?.provider === "fonnte" ? "active" : "pending"} label={cfg?.provider === "fonnte" ? "FONNTE AKTIF" : "SIMULATOR"} testid="wa-provider-badge" />} />
       <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
         <Panel title="Riwayat Pesan">
           <FilterBar>

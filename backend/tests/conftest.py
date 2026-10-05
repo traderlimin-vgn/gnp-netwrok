@@ -85,3 +85,10 @@ def teknisi_client():
     c = login_client("teknisi1@networkgmp.id")
     yield c
     c.close()
+
+
+@pytest.fixture(scope="session")
+def cs_client():
+    c = login_client("cs@networkgmp.id")
+    yield c
+    c.close()

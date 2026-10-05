@@ -10,7 +10,7 @@ import { Field, NSelect, PageHeader, Panel, StatusBadge } from "@/components/com
 import { KV, Modal, Tbl } from "@/components/kit";
 import { apiGet, apiPost, apiPut, errMsg } from "@/lib/api";
 import { fmtDate, ROLE_LABEL } from "@/lib/format";
-import type { AcsConfig, AcsConfigIn, AcsTestResult, BackupFile, Health, IsolationMethod, Role, Settings, User, UserIn } from "@/lib/types";
+import type { AcsConfig, AcsConfigIn, AcsTestResult, BackupFile, Health, IsolationMethod, Role, Settings, User, UserIn, WaConfig, WaConfigIn, WaProvider, WaTestResult } from "@/lib/types";
 
 const METHODS: [IsolationMethod, string][] = [["disable_secret", "Disable PPP Secret"], ["change_profile", "Change PPP Profile"], ["disconnect", "Disconnect Active Session"]];
 
@@ -79,6 +79,54 @@ function SettingsForm() {
       </Panel>
       <Button onClick={() => save.mutate(f)} disabled={save.isPending} data-testid="settings-save-button"><Save className="h-4 w-4" />Simpan Pengaturan</Button>
     </div>
+  );
+}
+
+function WhatsAppPanel() {
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ["wa-config"], queryFn: () => apiGet<WaConfig>("/whatsapp/config") });
+  const [f, setF] = useState<WaConfigIn | null>(null);
+  const [testTo, setTestTo] = useState("");
+  const [test, setTest] = useState<WaTestResult | null>(null);
+  useEffect(() => { if (data) setF({ provider: data.provider, token: "", country_code: data.country_code, device_label: data.device_label }); }, [data]);
+  const save = useMutation({
+    mutationFn: (b: WaConfigIn) => apiPut<WaConfig>("/whatsapp/config", { ...b, token: b.token || null }),
+    onSuccess: (c) => { qc.setQueryData(["wa-config"], c); qc.invalidateQueries({ queryKey: ["settings"] }); toast.success("Konfigurasi WhatsApp disimpan"); },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  const run = useMutation({
+    mutationFn: () => apiPost<WaTestResult>("/whatsapp/test", { to: testTo }),
+    onSuccess: (r) => { setTest(r); qc.invalidateQueries({ queryKey: ["wa-config"] }); r.success ? toast.success(r.message) : toast.error(r.message); },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  if (!f) return <div className="text-sm text-muted-foreground">Memuat…</div>;
+  const set = <K extends keyof WaConfigIn>(k: K, v: WaConfigIn[K]) => setF({ ...f, [k]: v });
+  return (
+    <Panel title="WhatsApp Gateway" testid="settings-whatsapp-panel">
+      <div className="mb-3 flex items-start gap-2 rounded-lg border border-sky-500/25 bg-sky-500/5 p-3 text-xs text-sky-200">
+        <ShieldAlert className="h-4 w-4 shrink-0" />Mode <b>Simulator</b>: pesan hanya dicatat, tidak dikirim. Mode <b>Fonnte</b>: pesan dikirim dari nomor WhatsApp pribadi Anda yang dipasangkan (scan QR) di dashboard Fonnte. Token perangkat disimpan terenkripsi & tidak pernah dikembalikan ke browser.
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field label="Provider"><NSelect value={f.provider} onChange={(v) => set("provider", v as WaProvider)} options={[{ value: "simulator", label: "Simulator (demo, tidak dikirim)" }, { value: "fonnte", label: "Fonnte (nomor pribadi via QR)" }]} testid="wa-provider-select" /></Field>
+        <Field label="Label perangkat (opsional)" hint="Mis. 'WA Admin 0812…'"><Input value={f.device_label} onChange={(e) => set("device_label", e.target.value)} data-testid="wa-device-label-input" /></Field>
+        {f.provider === "fonnte" && <>
+          <Field label="Token perangkat Fonnte" hint={data?.has_token ? "Tersimpan terenkripsi · kosongkan jika tidak diubah" : "Ambil dari dashboard Fonnte → Device → Token"}><Input type="password" value={f.token ?? ""} onChange={(e) => set("token", e.target.value)} className="font-mono" placeholder="••••••••" data-testid="wa-token-input" /></Field>
+          <Field label="Kode negara" hint="Default 62 (Indonesia)"><Input value={f.country_code} onChange={(e) => set("country_code", e.target.value)} className="font-mono" data-testid="wa-country-code-input" /></Field>
+        </>}
+      </div>
+      {f.provider === "fonnte" && (
+        <div className="mt-3 rounded-lg border bg-background/40 p-3 text-xs text-muted-foreground" data-testid="wa-pairing-steps">
+          <b className="text-foreground">Cara memasangkan nomor pribadi:</b> 1) Daftar/masuk di fonnte.com. 2) Menu <b>Device</b> → Add Device → Connect, lalu scan QR dari WhatsApp (Perangkat Tertaut → Tautkan perangkat). 3) Klik <b>Token</b> pada device, salin ke kolom di atas. 4) Simpan, lalu kirim <b>Tes</b> ke nomor Anda sendiri.
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <div className="w-full max-w-[220px]"><Field label="Nomor tujuan tes" hint="Format 628xxxxxxxxx"><Input value={testTo} onChange={(e) => setTestTo(e.target.value)} className="font-mono" placeholder="628123456789" data-testid="wa-test-to-input" /></Field></div>
+        <Button onClick={() => save.mutate(f)} disabled={save.isPending} data-testid="wa-config-save-button"><Save className="h-4 w-4" />Simpan</Button>
+        <Button variant="outline" onClick={() => run.mutate()} disabled={run.isPending || testTo.length < 8} data-testid="wa-config-test-button">{run.isPending ? "Mengirim…" : "Kirim Tes"}</Button>
+      </div>
+      {test && <div className={`mt-3 rounded-lg p-3 text-sm ${test.success ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"}`} data-testid="wa-test-result">{test.success ? "✓ " : "✕ "}{test.message} · via {test.provider} · {test.response_ms} ms</div>}
+      {!test && data?.last_test && <div className="mt-3 text-xs text-muted-foreground">Tes terakhir: {fmtDate(data.last_test, true)} · {data.last_test_ok ? "berhasil" : "gagal"}</div>}
+    </Panel>
   );
 }
 
@@ -205,11 +253,13 @@ export default function SettingsPage() {
         <TabsList data-testid="settings-tabs">
           <TabsTrigger value="general" data-testid="settings-tab-general">Network & Billing</TabsTrigger>
           <TabsTrigger value="genieacs" data-testid="settings-tab-genieacs">GenieACS</TabsTrigger>
+          <TabsTrigger value="whatsapp" data-testid="settings-tab-whatsapp">WhatsApp</TabsTrigger>
           <TabsTrigger value="users" data-testid="settings-tab-users">User & Role</TabsTrigger>
           <TabsTrigger value="system" data-testid="settings-tab-system">Sistem & Backup</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="mt-4"><SettingsForm /></TabsContent>
         <TabsContent value="genieacs" className="mt-4"><GenieAcsPanel /></TabsContent>
+        <TabsContent value="whatsapp" className="mt-4"><WhatsAppPanel /></TabsContent>
         <TabsContent value="users" className="mt-4"><Users /></TabsContent>
         <TabsContent value="system" className="mt-4"><System /></TabsContent>
       </Tabs>

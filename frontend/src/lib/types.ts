@@ -94,6 +94,10 @@ export interface Settings {
 export interface WhatsAppMessage {
   id: string; to: string; name: string; template: string; message: string; status: string; provider: string; error: string; created_at: string;
 }
+export type WaProvider = "simulator" | "fonnte";
+export interface WaConfigIn { provider: WaProvider; token?: string | null; country_code: string; device_label: string }
+export interface WaConfig { provider: WaProvider; country_code: string; device_label: string; has_token: boolean; last_test: string | null; last_test_ok: boolean | null }
+export interface WaTestResult { success: boolean; message: string; provider: string; response_ms: number }
 export interface TicketIn { customer_id: string; complaint: string; priority: string; technician_id: string; notes: string }
 export interface TicketUpdate { status?: string; technician_id?: string; priority?: string; notes?: string; photo_url?: string }
 export interface Ticket {

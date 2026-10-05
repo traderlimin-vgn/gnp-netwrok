@@ -4,12 +4,13 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 
-from integrations.whatsapp.service import WhatsAppService, maps_link
+from integrations.whatsapp.service import WhatsAppService, maps_link, config_out as wa_config_out, save_config as wa_save_config
 from lib.core import uid, now_iso, next_code, audit, notify, paginate, regex_or, clean
 from lib.db import db
 from lib.security import require, current_user
 from models.schemas import (Notification, Paged, Psb, PsbIn, PsbUpdate, Ticket, TicketIn, TicketUpdate, UploadOut, User,
                             WhatsAppMessage, WhatsAppSendIn, MapPoint, AuditLog)
+from models.whatsapp import WaConfig, WaConfigIn, WaTestIn, WaTestResult
 
 router = APIRouter()
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
@@ -186,6 +187,22 @@ async def map_points(_: dict = Depends(require("map.view"))):
 
 
 # ---------- whatsapp ----------
+@router.get("/whatsapp/config", response_model=WaConfig)
+async def wa_get_config(_: dict = Depends(require("whatsapp.send"))):
+    return await wa_config_out()
+
+
+@router.put("/whatsapp/config", response_model=WaConfig)
+async def wa_put_config(body: WaConfigIn, actor: dict = Depends(require("settings.manage"))):
+    return await wa_save_config(body.model_dump(), actor)
+
+
+@router.post("/whatsapp/test", response_model=WaTestResult)
+async def wa_test(body: WaTestIn, actor: dict = Depends(require("settings.manage"))):
+    from models.schemas import norm_wa
+    return await WhatsAppService.test(norm_wa(body.to), actor)
+
+
 @router.post("/whatsapp/send", response_model=WhatsAppMessage)
 async def wa_send(body: WhatsAppSendIn, actor: dict = Depends(require("whatsapp.send"))):
     msg = await WhatsAppService.send(body.to, body.message, body.name)

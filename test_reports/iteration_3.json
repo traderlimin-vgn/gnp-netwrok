@@ -1,0 +1,63 @@
+{
+  "iteration": 3,
+  "mode": "retest",
+  "summary": "Retest of new WhatsApp gateway integration (runtime-selectable Simulator/Fonnte provider, encrypted token). Backend: 30/30 pytest pass (8 new WhatsApp tests + 22 pre-existing). Browser: 3/3 new WhatsApp checks pass (1 initial run hit the app's own login rate-limiter from back-to-back reruns in-session -> classified flaky, passed clean after cooldown + a trivial strict-mode selector fix in the check script itself, not an app bug). All 7 acceptance_matrix criteria covered. Provider left reset to simulator.",
+  "passed": 6,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    "Repeated back-to-back logins across checks within one session can trip the backend's login rate-limiter (10/60s per IP), as previously noted in iteration_2 -- not a defect, schedule WhatsApp/login-heavy reruns >60s apart."
+  ],
+  "retest_needed": true,
+  "checks": [
+    {
+      "criterion": "WhatsApp config GET/PUT roundtrip + token secrecy (backend).",
+      "name": "test_tscheck_whatsapp_config_secrecy.py::test_config_roundtrip_hides_token",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /whatsapp/config -> 200 {provider:simulator,has_token:false}. PUT {provider:fonnte,token:'DUMMY-TOKEN-tscheck-wa-secrecy',...} -> 200 has_token:true, raw token absent from response body. GET again -> 200 provider:fonnte, has_token:true, raw token string absent from body (json.dumps scan). Reset PUT {provider:simulator} -> 200; final GET confirms provider:simulator."
+    },
+    {
+      "criterion": "RBAC on WhatsApp config (backend).",
+      "name": "test_tscheck_whatsapp_rbac.py (5 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PUT /whatsapp/config as finance -> 403; as cs -> 403. POST /whatsapp/test as finance -> 403. GET /whatsapp/config as cs -> 200 {provider:...}. GET /whatsapp/config unauthenticated (no cookie) -> 401."
+    },
+    {
+      "criterion": "Simulator test + send still work (backend).",
+      "name": "test_tscheck_whatsapp_simulator.py::test_simulator_test_and_send",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "With provider forced to simulator: POST /whatsapp/test {to:628123456789} -> 200 {success:true, provider:simulator}. POST /whatsapp/send {to,message:'tscheck-wa-sim-send hello'} -> 200 {status:sent, provider:simulator}. GET /whatsapp/messages -> 200, sent message text found in list."
+    },
+    {
+      "criterion": "Fonnte test with invalid token fails gracefully (backend).",
+      "name": "test_tscheck_whatsapp_fonnte_failure.py::test_fonnte_invalid_token_graceful_failure",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PUT /whatsapp/config {provider:fonnte, token:'DUMMY-INVALID-TOKEN-tscheck'} -> 200. POST /whatsapp/test {to:628123456789} -> HTTP 200 (no 500/crash) {success:false, message:<non-empty Indonesian/Fonnte error>}. Reset to simulator confirmed via final GET in a try/finally block."
+    },
+    {
+      "criterion": "Settings -> WhatsApp tab UI renders and toggles provider-specific fields (frontend, super_admin).",
+      "name": "settings-whatsapp-tab-toggle",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "/settings -> settings-tab-whatsapp click -> wa-provider-select visible. selectOption('fonnte') revealed wa-token-input, wa-country-code-input, wa-pairing-steps. selectOption('simulator') hid wa-token-input and wa-pairing-steps again. No console errors."
+    },
+    {
+      "criterion": "Save Fonnte config from the UI then reset (frontend, super_admin).",
+      "name": "settings-whatsapp-save-reset",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Selected fonnte, filled wa-token-input='tscheck-dummy-token-save-reset' + device label, clicked wa-config-save-button -> toast 'Konfigurasi WhatsApp disimpan' visible. Reopened tab: provider persisted as fonnte but wa-token-input value != the plaintext saved token (masked/placeholder). Switched back to simulator, saved again, reopened tab -> provider confirmed simulator."
+    },
+    {
+      "criterion": "WhatsApp page provider badge reflects current provider (frontend).",
+      "name": "whatsapp-page-provider-badge",
+      "lane": "browser",
+      "status": "flaky",
+      "evidence": "First attempt hit a 429 from the backend's own login rate-limiter (reran too soon after prior checks' logins) -> no app bug. After a 65s cooldown the check passed: /whatsapp shows wa-provider-badge text 'SIMULATOR' and subtitle 'Mode: SIMULATOR (pesan dicatat, tidak dikirim ke ...)'. A second rerun-fix was only a strict-mode selector narrowing in the check script itself (two 'simulator' text matches on page), not an app defect; subsequent rerun passed cleanly."
+    }
+  ]
+}
